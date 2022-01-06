@@ -63,9 +63,10 @@ object DialogRestrictToken: TDialogRestrictToken
         ParentShowHint = False
         ShowHint = True
         TabOrder = 0
-        inherited VST: TVirtualStringTree
+        inherited VST: TVirtualStringTreeEx
           Width = 376
           Height = 369
+          TreeOptions.MiscOptions = [toAcceptOLEDrop, toCheckSupport, toFullRepaintOnResize, toInitOnSave, toToggleOnDblClick, toWheelPanning]
         end
       end
     end
@@ -142,9 +143,10 @@ object DialogRestrictToken: TDialogRestrictToken
         ParentShowHint = False
         ShowHint = True
         TabOrder = 3
-        inherited VST: TVirtualStringTree
+        inherited VST: TVirtualStringTreeEx
           Width = 376
           Height = 331
+          TreeOptions.MiscOptions = [toAcceptOLEDrop, toCheckSupport, toFullRepaintOnResize, toInitOnSave, toToggleOnDblClick, toWheelPanning]
         end
       end
     end
@@ -169,7 +171,7 @@ object DialogRestrictToken: TDialogRestrictToken
         ParentFont = False
         TabOrder = 0
       end
-      inline PrivilegesFrame: TPrivilegesFrame
+      inline PrivilegesFrame: TFramePrivileges
         AlignWithMargins = True
         Left = 3
         Top = 26
@@ -177,15 +179,11 @@ object DialogRestrictToken: TDialogRestrictToken
         Height = 346
         Margins.Top = 26
         Align = alClient
-        DoubleBuffered = True
-        ParentDoubleBuffered = False
-        ParentShowHint = False
-        ShowHint = True
         TabOrder = 1
-        inherited ListViewEx: TListViewEx
-          Width = 338
-          Height = 299
-          Checkboxes = True
+        inherited VST: TVirtualStringTreeEx
+          Width = 376
+          Height = 346
+          TreeOptions.MiscOptions = [toAcceptOLEDrop, toCheckSupport, toFullRepaintOnResize, toInitOnSave, toToggleOnDblClick, toWheelPanning]
         end
       end
     end

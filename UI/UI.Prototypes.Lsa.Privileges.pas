@@ -5,7 +5,7 @@ interface
 uses
   System.SysUtils, System.Classes, Vcl.Graphics, Vcl.Controls, Vcl.Forms,
   Vcl.Dialogs, Vcl.ComCtrls, VclEx.ListView, Vcl.StdCtrls, NtUtils.Security.Sid,
-  Winapi.WinNt, NtUtils.Lsa, UI.Prototypes.Privileges, Vcl.Menus, Ntapi.ntseapi,
+  Ntapi.WinNt, NtUtils.Lsa, UI.Prototypes.Privileges, Vcl.Menus, Ntapi.ntseapi,
   NtUtils;
 
 type
@@ -15,14 +15,13 @@ type
     PopupMenu: TPopupMenu;
     MenuEnable: TMenuItem;
     MenuDisable: TMenuItem;
-    PrivilegesFrame: TPrivilegesFrame;
+    PrivilegesFrame: TFramePrivileges;
     procedure MenuEnableClick(Sender: TObject);
     procedure MenuDisableClick(Sender: TObject);
     procedure ButtonApplyClick(Sender: TObject);
   private
     Sid: ISid;
     CurrentlyAssigned: TArray<TPrivilege>;
-    procedure SetSelectedPrivState(Attributes: Cardinal);
   public
     procedure DeleyedCreate;
     procedure LoadForSid(Sid: ISid);
@@ -31,64 +30,36 @@ type
 implementation
 
 uses
-  Ntapi.ntstatus, Ntapi.ntdef, NtUiLib.Exceptions;
+  Ntapi.ntstatus, Ntapi.ntdef, NtUiLib.Errors, DelphiUtils.Arrays;
 
 {$R *.dfm}
 
 { TFrameLsaPolicy }
 
-function FindPrivInArray(PrivArray: TArray<TPrivilege>; Value: TLuid):
-  PPrivilege;
-var
-  i: Integer;
-begin
-  for i := 0 to High(PrivArray) do
-    if PrivArray[i].Luid = Value then
-      Exit(@PrivArray[i]);
-
-  Result := nil;
-end;
-
 procedure TFrameLsaPrivileges.ButtonApplyClick(Sender: TObject);
 var
-  PrivToAdd, PrivToRemove: TArray<TPrivilege>;
-  i: Integer;
-  Current: PPrivilege;
-  New: TPrivilege;
+  Added, Removed: TArray<TPrivilege>;
 begin
-  SetLength(PrivToAdd, 0);
-  SetLength(PrivToRemove, 0);
+  Added := PrivilegesFrame.Checked;
 
-  for i := 0 to Pred(PrivilegesFrame.ListViewEx.Items.Count) do
-  with PrivilegesFrame.ListViewEx.Items[i] do
+  Removed := TArray.Filter<TPrivilege>(CurrentlyAssigned,
+    function (const Privilege: TPrivilege): Boolean
     begin
-      Current := FindPrivInArray(CurrentlyAssigned,
-        PrivilegesFrame.Privilege[i].Luid);
-
-      New := PrivilegesFrame.Privilege[i];
-
-      if Checked and (not Assigned(Current) or
-        (Current.Attributes <> New.Attributes)) then
-      begin
-        // It was enabled or modified, add
-        SetLength(PrivToAdd, Length(PrivToAdd) + 1);
-        PrivToAdd[High(PrivToAdd)] := New;
-      end;
-
-      if not Checked and Assigned(Current) then
-      begin
-        // It was disabled, remove
-        SetLength(PrivToRemove, Length(PrivToRemove) + 1);
-        PrivToRemove[High(PrivToRemove)] := New;
-      end;
-    end;
+      Result := not TArray.Contains<TPrivilege>(Added, Privilege,
+        function (const A, B: TPrivilege): Boolean
+        begin
+          Result := (A.Luid = B.Luid);
+        end
+      );
+    end
+  );
 
   try
-    LsaxManagePrivilegesAccount(Sid.Data, False, PrivToAdd,
-      PrivToRemove).RaiseOnError;
+    LsaxManagePrivilegesAccount(Sid, False, Added,
+      Removed).RaiseOnError;
   finally
     LoadForSid(Sid);
-    PrivilegesFrame.ListViewEx.SetFocus;
+    PrivilegesFrame.VST.SetFocus;
   end;
 end;
 
@@ -104,7 +75,7 @@ var
   Status: TNtxStatus;
 begin
   Self.Sid := Sid;
-  Status := LsaxEnumeratePrivilegesAccountBySid(Sid.Data, CurrentlyAssigned);
+  Status := LsaxEnumeratePrivilegesAccountBySid(Sid, CurrentlyAssigned);
 
   if Status.Matches(STATUS_OBJECT_NAME_NOT_FOUND, 'LsaOpenAccount') then
   begin
@@ -128,23 +99,13 @@ end;
 
 procedure TFrameLsaPrivileges.MenuDisableClick(Sender: TObject);
 begin
-  SetSelectedPrivState(0);
+  PrivilegesFrame.AdjustSelected(0);
 end;
 
 procedure TFrameLsaPrivileges.MenuEnableClick(Sender: TObject);
 begin
-  SetSelectedPrivState(SE_PRIVILEGE_ENABLED or SE_PRIVILEGE_ENABLED_BY_DEFAULT);
+  PrivilegesFrame.AdjustSelected(SE_PRIVILEGE_ENABLED or
+    SE_PRIVILEGE_ENABLED_BY_DEFAULT);
 end;
-
-procedure TFrameLsaPrivileges.SetSelectedPrivState(Attributes: Cardinal);
-var
-  i: Integer;
-begin
-  if PrivilegesFrame.ListViewEx.SelCount > 0 then
-    for i := 0 to Pred(PrivilegesFrame.ListViewEx.Items.Count) do
-      if PrivilegesFrame.ListViewEx.Items[i].Selected then
-        PrivilegesFrame.UpdateState(i, Attributes);
-end;
-
 
 end.

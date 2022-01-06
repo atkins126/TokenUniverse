@@ -7,7 +7,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
   Vcl.ComCtrls, Vcl.ExtCtrls, TU.Tokens, TU.Tokens.Types, NtUtils,
   UI.MainForm, UI.Prototypes, UI.Prototypes.Forms, NtUtils.Security.Sid,
-  Ntapi.ntseapi;
+  Ntapi.ntseapi, UI.Prototypes.Sid.Edit;
 
 type
   TCheckBoxMapping = record
@@ -17,11 +17,8 @@ type
   end;
 
   TDialogPickUser = class(TChildForm)
-    ComboBoxSID: TComboBox;
-    ButtonFilter: TButton;
     ButtonOK: TButton;
     ButtonCancel: TButton;
-    ButtonPick: TButton;
     GroupBoxMain: TGroupBox;
     CheckBoxEnabled: TCheckBox;
     CheckBoxEnabledByDafault: TCheckBox;
@@ -34,8 +31,8 @@ type
     CheckBoxResource: TCheckBox;
     CheckBoxLogon: TCheckBox;
     ButtonIntegrity: TButton;
-    ButtonLogonID: TButton;
-    procedure ButtonPickClick(Sender: TObject);
+    ButtonLogonSID: TButton;
+    SidEditor: TSidEditor;
     procedure ComboBoxSIDChange(Sender: TObject);
     procedure ButtonOKClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
@@ -44,14 +41,13 @@ type
     procedure CheckBoxMandatoryClick(Sender: TObject);
     procedure CheckBoxEnabledClick(Sender: TObject);
     procedure CheckBoxEnabledByDafaultClick(Sender: TObject);
+    procedure ButtonLogonSIDClick(Sender: TObject);
   private
     SelectedGroup: ISid;
-    IsValidGroup: Boolean;
     Mapping: array of TCheckBoxMapping;
-    procedure ObjPickerCallback(UserName: String);
     function GetAttributes: Cardinal;
     procedure SetAttributes(Value: Cardinal);
-    procedure SetSelectedGroup(Value: ISid);
+    procedure SetSelectedGroup(const Value: ISid);
     procedure DoDisableAttributes;
   public
     class function PickNew(AOwner: TComponent;
@@ -65,8 +61,8 @@ type
 implementation
 
 uses
-  TU.ObjPicker, UI.Modal.ComboDlg, Winapi.WinNt, UI.Helper,
-  NtUtils.Lsa.Sid, NtUiLib.Exceptions;
+  UI.Modal.Integrity, Ntapi.WinNt, Ntapi.ntrtl, Ntapi.ntpsapi,
+  UI.Helper, NtUtils.Lsa.Sid, NtUtils.WinUser, NtUiLib.Errors;
 
 {$R *.dfm}
 
@@ -82,26 +78,47 @@ end;
 
 procedure TDialogPickUser.ButtonIntegrityClick(Sender: TObject);
 var
+  CurrentRID: Cardinal;
   Sid: ISid;
 begin
-  RtlxNewSid(Sid, SECURITY_MANDATORY_LABEL_AUTHORITY,
-    [TComboDialog.PickIntegrity(Self)]).RaiseOnError;
+  CurrentRID := SECURITY_MANDATORY_MEDIUM_RID;
+
+  if Assigned(SelectedGroup) and
+    (RtlxIdentifierAuthoritySid(SelectedGroup) =
+    SECURITY_MANDATORY_LABEL_AUTHORITY) then
+    CurrentRID := RtlxRidSid(SelectedGroup);
+
+  RtlxCreateSid(Sid, SECURITY_MANDATORY_LABEL_AUTHORITY,
+    [TIntegrityPicker.Choose(Self, CurrentRID)]).RaiseOnError;
 
   SetSelectedGroup(Sid);
   SetAttributes(SE_GROUP_INTEGRITY or SE_GROUP_INTEGRITY_ENABLED);
+  ButtonOK.SetFocus;
+end;
+
+procedure TDialogPickUser.ButtonLogonSIDClick(Sender: TObject);
+var
+  Sid: ISid;
+begin
+  UsrxQuerySid(GetThreadDesktop(NtCurrentThreadId), Sid).RaiseOnError;
+
+  if Assigned(Sid) then
+    SetSelectedGroup(Sid)
+  else
+    raise Exception.Create('The current desktop does not have a logon SID.');
+
+  SetAttributes(SE_GROUP_LOGON_ID or SE_GROUP_ENABLED or
+    SE_GROUP_ENABLED_BY_DEFAULT);
+
+  ButtonOK.SetFocus;
 end;
 
 procedure TDialogPickUser.ButtonOKClick(Sender: TObject);
 begin
-  if ComboBoxSID.Enabled and not IsValidGroup then
-    LsaxLookupNameOrSddl(ComboBoxSID.Text, SelectedGroup).RaiseOnError;
+  if SidEditor.Enabled and not Assigned(SelectedGroup) then
+    LsaxLookupNameOrSddl(SidEditor.tbxSid.Text, SelectedGroup).RaiseOnError;
 
   ModalResult := mrOk;
-end;
-
-procedure TDialogPickUser.ButtonPickClick(Sender: TObject);
-begin
-  CallObjectPicker(Handle, ObjPickerCallback);
 end;
 
 procedure TDialogPickUser.CheckBoxDenyOnlyClick(Sender: TObject);
@@ -142,7 +159,7 @@ end;
 
 procedure TDialogPickUser.ComboBoxSIDChange(Sender: TObject);
 begin
-  IsValidGroup := False;
+  SelectedGroup := nil;
 end;
 
 procedure TDialogPickUser.DoDisableAttributes;
@@ -178,14 +195,6 @@ begin
       Result := Result or Mapping[i].Attribute;
 end;
 
-procedure TDialogPickUser.ObjPickerCallback(UserName: String);
-var
-  Sid: ISid;
-begin
-  LsaxLookupNameOrSddl(UserName, Sid).RaiseOnError;
-  SetSelectedGroup(Sid);
-end;
-
 class procedure TDialogPickUser.PickEditMultiple(AOwner: TComponent;
   Groups: TArray<TGroup>; out AttributesToAdd, AttributesToDelete:
   TGroupAttributes);
@@ -195,11 +204,13 @@ var
 begin
   with TDialogPickUser.Create(AOwner) do
   begin
-    ComboBoxSID.Enabled := False;
-    ButtonFilter.Enabled := False;
-    ButtonPick.Enabled := False;
+    SidEditor.Enabled := False;
+    SidEditor.tbxSid.Enabled := False;
+    SidEditor.btnDsPicker.Enabled := False;
+    SidEditor.btnCheatsheet.Enabled := False;
     ButtonIntegrity.Enabled := False;
-    ComboBoxSID.Text := '< Multiple values >';
+    ButtonLogonSID.Enabled := False;
+    SidEditor.tbxSid.Text := '< Multiple values >';
 
     BitwiseOr := 0;
     BitwiseAnd := Cardinal(not 0);
@@ -261,7 +272,7 @@ end;
 class function TDialogPickUser.PickNew(AOwner: TComponent;
   DisableAttributes: Boolean): TGroup;
 begin
-  with TDialogPickUser.Create(AOwner) do
+  with TDialogPickUser.CreateChild(AOwner, cfmApplication) do
   begin
     if DisableAttributes then
     begin
@@ -283,11 +294,10 @@ begin
     Mapping[i].CheckBox.SetCheckedEx(Value and Mapping[i].Attribute <> 0);
 end;
 
-procedure TDialogPickUser.SetSelectedGroup(Value: ISid);
+procedure TDialogPickUser.SetSelectedGroup;
 begin
-  IsValidGroup := True;
   SelectedGroup := Value;
-  ComboBoxSID.Text := LsaxSidToString(SelectedGroup.Data);
+  SidEditor.tbxSid.Text := LsaxSidToString(SelectedGroup);
 end;
 
 end.

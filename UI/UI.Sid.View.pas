@@ -45,7 +45,7 @@ type
     procedure ButtonApplyClick(Sender: TObject);
   private
     Sid: ISid;
-    procedure SetUserAudit(NewAudit: IAudit);
+    procedure SetUserAudit(const Audit: TArray<TAuditPolicyEntry>);
     procedure LoadLogonRights;
   public
     class procedure CreateView(AOwner: TComponent; SrcSid: ISid); static;
@@ -54,7 +54,7 @@ type
 implementation
 
 uses
-  Winapi.WinNt, NtUiLib.Exceptions, NtUtils.Lsa.Sid, Ntapi.ntrtl, Winapi.ntlsa,
+  Ntapi.WinNt, NtUiLib.Errors, NtUtils.Lsa.Sid, Ntapi.ntrtl, Ntapi.ntlsa,
   Ntapi.ntstatus, DelphiApi.Reflection, NtUtils.Lsa, Ntapi.ntdef,
   DelphiUiLib.Reflection.Strings, DelphiUiLib.Reflection.Numeric;
 
@@ -64,7 +64,7 @@ uses
 
 procedure TDialogSidView.ButtonApplyClick(Sender: TObject);
 begin
-  LsaxSetRightsAccountBySid(Sid.Data, LogonMaskFrame.Value).RaiseOnError;
+  LsaxSetRightsAccountBySid(Sid, LogonMaskFrame.Value).RaiseOnError;
   LogonMaskFrame.Value := LogonMaskFrame.Value;
 end;
 
@@ -81,24 +81,24 @@ begin
   if not Assigned(SrcSid) then
     Exit;
 
-  with TDialogSidView.CreateChild(AOwner, True) do
+  with TDialogSidView.CreateChild(AOwner, cfmDesktop) do
   begin
     Sid := SrcSid;
 
-    if not LsaxLookupSid(Sid.Data, Lookup).IsSuccess then
+    if not LsaxLookupSid(Sid, Lookup).IsSuccess then
     begin
       Lookup.SidType := SidTypeUndefined;
       Lookup.DomainName := '';
       Lookup.UserName := '';
     end;
 
-    Caption := Caption + ' for "' + LsaxSidToString(Sid.Data) +'"';
+    Caption := Caption + ' for "' + LsaxSidToString(Sid) +'"';
 
     if not (Lookup.SidType in [SidTypeUndefined, SidTypeInvalid,
       SidTypeUnknown]) then
       EditFullName.Text := Lookup.FullName;
 
-    EditSID.Text := RtlxSidToString(Sid.Data);
+    EditSID.Text := RtlxSidToString(Sid);
     EditType.Text := PrettifyCamelCaseEnum(TypeInfo(TSidNameUse),
         Integer(Lookup.SidType), 'SidType');
     EditSubAuthorities.Text := IntToStr(RtlSubAuthorityCountSid(
@@ -137,7 +137,7 @@ begin
     FrameLsaPrivileges.LoadForSid(Sid);
 
     FrameLsaAudit.OnApplyClick := SetUserAudit;
-    FrameLsaAudit.LoadForSid(Sid.Data);
+    FrameLsaAudit.LoadForSid(Sid);
 
     Show;
   end;
@@ -149,7 +149,7 @@ var
   DomainSid: ISid;
   Lookup: TTranslatedName;
 begin
-  if LsaxLookupSid(Sid.Data, Lookup).IsSuccess and (Lookup.DomainName <> '') then
+  if LsaxLookupSid(Sid, Lookup).IsSuccess and (Lookup.DomainName <> '') then
   begin
     LsaxLookupName(Lookup.DomainName, DomainSid).RaiseOnError;
     TDialogSidView.CreateView(Owner, DomainSid);
@@ -161,7 +161,7 @@ procedure TDialogSidView.LinkLabelMinusOneLinkClick(Sender: TObject;
 var
   Parent: ISid;
 begin
-  if RtlxParentSid(Parent, Sid.Data).IsSuccess then
+  if RtlxMakeParentSid(Parent, Sid).IsSuccess then
     TDialogSidView.CreateView(Owner, Parent);
 end;
 
@@ -170,7 +170,7 @@ var
   xStatus: TNtxStatus;
   Rights: TSystemAccess;
 begin
-  xStatus := LsaxQueryRightsAccountBySid(Sid.Data, Rights);
+  xStatus := LsaxQueryRightsAccountBySid(Sid, Rights);
 
   if xStatus.Matches(STATUS_OBJECT_NAME_NOT_FOUND, 'LsaOpenAccount') then
   begin
@@ -189,15 +189,15 @@ begin
   LogonMaskFrame.Value := Rights;
 end;
 
-procedure TDialogSidView.SetUserAudit(NewAudit: IAudit);
+procedure TDialogSidView.SetUserAudit;
 begin
   FrameLsaAudit.LabelStatus.Caption := '';
   FrameLsaAudit.LabelStatus.Hint := '';
 
   try
-    (NewAudit as IPerUserAudit).AssignToUser(Sid.Data).RaiseOnError;
+    LsaxSetUserAudit(Sid, Audit).RaiseOnError;
   finally
-    FrameLsaAudit.LoadForSid(Sid.Data);
+    FrameLsaAudit.LoadForSid(Sid);
   end;
 end;
 

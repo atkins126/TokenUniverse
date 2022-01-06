@@ -63,7 +63,7 @@ end;
 
 class procedure TDialogACProfiles.Execute(AOwner: TComponent; LockToUser: ISid);
 begin
-  with TDialogACProfiles.CreateChild(AOwner, True) do
+  with TDialogACProfiles.CreateChild(AOwner, cfmDesktop) do
   begin
     UpdateProfileList(LockToUser);
     UpdateAppContainers;
@@ -74,7 +74,7 @@ end;
 class function TDialogACProfiles.ExecuteSelect(AOwner: TComponent;
   LockToUser: ISid): ISid;
 begin
-  with TDialogACProfiles.CreateChild(AOwner, True) do
+  with TDialogACProfiles.CreateChild(AOwner, cfmApplication) do
   begin
     UpdateProfileList(LockToUser);
     UpdateAppContainers;
@@ -117,7 +117,7 @@ var
   Info: TAppContainerInfo;
   i: Integer;
 begin
-  if not UnvxEnumerateAppContainers(AppContainers, User.Data).IsSuccess then
+  if not UnvxEnumerateAppContainers(AppContainers, User).IsSuccess then
     Exit;
 
   lvAppContainers.Items.BeginUpdate;
@@ -126,10 +126,10 @@ begin
   for i := 0 to High(AppContainers) do
     with lvAppContainers.Items.Add do
     begin
-      Cell[2] := RtlxSidToString(AppContainers[i].Data);
+      Cell[2] := RtlxSidToString(AppContainers[i]);
 
-      if UnvxQueryAppContainer(Info, AppContainers[i].Data,
-        User.Data).IsSuccess then
+      if UnvxQueryAppContainer(Info, AppContainers[i],
+        User).IsSuccess then
       begin
         Cell[0] := Info.DisplayName;
         Cell[1] := Info.Name;
@@ -149,7 +149,7 @@ begin
   if Assigned(LockToUser) then
   begin
     Profiles := [LockToUser];
-    cbProfile.Items.Add(LsaxSidToString(LockToUser.Data));
+    cbProfile.Items.Add(LsaxSidToString(LockToUser));
     cbProfile.ItemIndex := 0;
     cbProfile.Enabled := False;
     Exit;
@@ -161,7 +161,7 @@ begin
     cbProfile.Items.BeginUpdate;
 
     for i := 0 to High(Profiles) do
-      cbProfile.Items.Add(LsaxSidToString(Profiles[i].Data));
+      cbProfile.Items.Add(LsaxSidToString(Profiles[i]));
 
     cbProfile.Items.EndUpdate;
   end;

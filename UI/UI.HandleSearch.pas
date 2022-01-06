@@ -19,6 +19,7 @@ type
     procedure ButtonRefreshClick(Sender: TObject);
     procedure cmInspectClick(Sender: TObject);
     procedure cmSaveClick(Sender: TObject);
+    procedure ButtonCloseClick(Sender: TObject);
   private
   public
     { Public declarations }
@@ -28,11 +29,16 @@ implementation
 
 uses
   System.UITypes, UI.MainForm, UI.Information, TU.Tokens,
-  Winapi.WinNt, Ntapi.ntpebteb, NtUtils, NtUtils.Objects.Snapshots,
-  NtUiLib.Exceptions, DelphiUtils.Arrays, NtUtils.Processes,
-  NtUtils.Processes.Query, NtUtils.Objects;
+  Ntapi.WinNt, Ntapi.ntpebteb, NtUtils, NtUtils.Objects.Snapshots,
+  NtUiLib.Errors, DelphiUtils.Arrays, NtUtils.Processes,
+  NtUtils.Processes.Info, NtUtils.Objects;
 
 {$R *.dfm}
+
+procedure TFormHandleSearch.ButtonCloseClick;
+begin
+  Close;
+end;
 
 procedure TFormHandleSearch.ButtonRefreshClick(Sender: TObject);
 var

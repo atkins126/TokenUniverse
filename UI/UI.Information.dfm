@@ -357,8 +357,8 @@ object InfoDialog: TInfoDialog
         OnClick = BtnSetVEnabledClick
       end
       object BtnSetAEnabled: TButton
-        Left = 188
-        Top = 258
+        Left = 191
+        Top = 284
         Width = 24
         Height = 23
         ImageAlignment = iaCenter
@@ -604,31 +604,27 @@ object InfoDialog: TInfoDialog
         ParentShowHint = False
         ShowHint = True
         TabOrder = 0
-        inherited VST: TVirtualStringTree
+        inherited VST: TVirtualStringTreeEx
           Width = 388
           Height = 369
+          NodePopupMenu = GroupPopup
         end
       end
     end
     object TabPrivileges: TTabSheet
       Caption = 'Privileges'
       ImageIndex = 2
-      inline PrivilegesFrame: TPrivilegesFrame
-        AlignWithMargins = True
-        Left = 3
-        Top = 3
-        Width = 382
-        Height = 363
+      inline PrivilegesFrame: TFramePrivileges
+        Left = 0
+        Top = 0
+        Width = 388
+        Height = 369
         Align = alClient
-        DoubleBuffered = True
-        ParentDoubleBuffered = False
-        ParentShowHint = False
-        ShowHint = True
         TabOrder = 0
-        inherited ListViewEx: TListViewEx
-          Width = 382
-          Height = 363
-          PopupMenu = PrivilegePopup
+        inherited VST: TVirtualStringTreeEx
+          Width = 388
+          Height = 369
+          NodePopupMenu = PrivilegePopup
         end
       end
     end
@@ -646,7 +642,7 @@ object InfoDialog: TInfoDialog
         ParentShowHint = False
         ShowHint = True
         TabOrder = 0
-        inherited VST: TVirtualStringTree
+        inherited VST: TVirtualStringTreeEx
           Width = 388
           Height = 369
         end

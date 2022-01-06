@@ -6,7 +6,7 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls,
   VclEx.ListView, UI.Prototypes, NtUtils.Lsa.Logon,
-  TU.Tokens, Winapi.WinNt, Vcl.StdCtrls;
+  TU.Tokens, Ntapi.WinNt, Vcl.StdCtrls;
 
 type
   TFrameLogon = class(TFrame)
@@ -38,9 +38,8 @@ implementation
 
 uses
   Vcl.Graphics, UI.Colors, DelphiUiLib.Strings, NtUtils.Security.Sid,
-  Ntapi.ntseapi, Winapi.NtSecApi,
-  DelphiUiLib.Reflection.Records, DelphiUtils.AutoObject,
-  DelphiUiLib.Reflection;
+  Ntapi.ntseapi, Ntapi.NtSecApi, NtUtils,
+  DelphiUiLib.Reflection.Records, DelphiUiLib.Reflection;
 
 {$R *.dfm}
 
@@ -148,7 +147,7 @@ begin
     begin
       ListView.Items[0].Cell[1] := IntToHexEx(LogonId);
 
-      TRecord.Traverse(IMem.RefOrNil<PSecurityLogonSessionData>(Detailed),
+      TRecord.Traverse(Auto.RefOrNil<PSecurityLogonSessionData>(Detailed),
         procedure (const Field: TFieldReflection)
         var
           SidReflection: TRepresentation;

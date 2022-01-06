@@ -11,8 +11,9 @@ type
   TDialogSystemAudit = class(TChildForm)
     FrameAudit: TFrameAudit;
     procedure FormCreate(Sender: TObject);
+    procedure FormKeyPress(Sender: TObject; var Key: Char);
   private
-    procedure SetSystemAudit(NewAudit: IAudit);
+    procedure SetSystemAudit(const NewAudit: TArray<TAuditPolicyEntry>);
   public
     constructor Create(AOwner: TComponent); override;
   end;
@@ -20,7 +21,7 @@ type
 implementation
 
 uses
-  NtUtils, NtUiLib.Exceptions;
+  NtUtils, NtUiLib.Errors;
 
 {$R *.dfm}
 
@@ -28,7 +29,7 @@ uses
 
 constructor TDialogSystemAudit.Create(AOwner: TComponent);
 begin
-  inherited CreateChild(AOwner, True);
+  inherited CreateChild(AOwner, cfmDesktop);
 end;
 
 procedure TDialogSystemAudit.FormCreate(Sender: TObject);
@@ -37,10 +38,16 @@ begin
   FrameAudit.LoadForSystem;
 end;
 
-procedure TDialogSystemAudit.SetSystemAudit(NewAudit: IAudit);
+procedure TDialogSystemAudit.FormKeyPress(Sender: TObject; var Key: Char);
+begin
+  if Key = #27 then
+    Close;
+end;
+
+procedure TDialogSystemAudit.SetSystemAudit;
 begin
   try
-    (NewAudit as ISystemAudit).AssignToSystem.RaiseOnError;
+    LsaxSetSystemAudit(NewAudit).RaiseOnError;
   finally
     FrameAudit.LoadForSystem;
   end;

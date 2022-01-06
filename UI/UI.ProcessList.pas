@@ -60,9 +60,9 @@ type
 implementation
 
 uses
-  Winapi.WinUser, Winapi.Shell, UI.Modal.ThreadList, NtUtils.Processes,
+  Ntapi.WinUser, Ntapi.ShellApi, UI.Modal.ThreadList, NtUtils.Processes,
   UI.ProcessIcons, NtUtils, Ntapi.ntexapi, UI.Colors, Vcl.Dialogs,
-  NtUILib.Exceptions, Ntapi.ntstatus, Winapi.WinNt, Ntapi.ntpsapi,
+  NtUILib.Errors, Ntapi.ntstatus, Ntapi.WinNt, Ntapi.ntpsapi,
   System.UITypes;
 
 {$R *.dfm}
@@ -155,7 +155,7 @@ class function TProcessListDialog.Execute(AOwner: TComponent;
 var
   Process: PProcessEntry;
 begin
-  with TProcessListDialog.Create(AOwner) do
+  with TProcessListDialog.CreateChild(AOwner, cfmApplication) do
   begin
     PickThread := AllowSelectThread;
 

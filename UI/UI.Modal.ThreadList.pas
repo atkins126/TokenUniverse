@@ -31,8 +31,8 @@ type
 implementation
 
 uses
-  Ntapi.ntexapi, UI.Colors, NtUtils.WinUser, Winapi.WinNt, Ntapi.ntpsapi,
-  Ntapi.ntdef, NtUtils, NtUtils.Threads, NtUiLib.Exceptions, Ntapi.ntstatus,
+  Ntapi.ntexapi, UI.Colors, NtUtils.WinUser, Ntapi.WinNt, Ntapi.ntpsapi,
+  Ntapi.ntdef, NtUtils, NtUtils.Threads, NtUiLib.Errors, Ntapi.ntstatus,
   System.UITypes;
 
 {$R *.dfm}
@@ -85,7 +85,7 @@ constructor TThreadListDialog.CreateFrom(AOwner: TComponent;
 var
   i: Integer;
 begin
-  inherited Create(AOwner);
+  inherited CreateChild(AOwner, cfmApplication);
 
   Caption := Format('Threads of %s [%d]', [Process.ImageName,
     Process.Basic.ProcessId]);

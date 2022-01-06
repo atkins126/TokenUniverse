@@ -55,8 +55,8 @@ type
     CheckBoxNoWriteUp: TCheckBox;
     CheckBoxNewProcMin: TCheckBox;
     CheckBoxSession: TCheckBox;
-    PrivilegesFrame: TPrivilegesFrame;
     GroupsFrame: TFrameGroups;
+    PrivilegesFrame: TFramePrivileges;
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure ButtonAddSIDClick(Sender: TObject);
@@ -75,10 +75,8 @@ type
     procedure ButtonLoadClick(Sender: TObject);
   private
     LogonIDSource: TLogonSessionSource;
-    procedure ObjPickerUserCallback(UserName: String);
     procedure AddGroup(NewGroup: TGroup);
     procedure UpdatePrimaryAndOwner(Mode: TGroupUpdateType);
-    procedure SetPrivilegesAttributes(NewValue: Cardinal);
     procedure EditSingleGroup(const Value: TGroup);
   public
     constructor Create(AOwner: TComponent); override;
@@ -87,10 +85,10 @@ type
 implementation
 
 uses
-  UI.Modal.PickUser, TU.ObjPicker, TU.Winapi, VirtualTrees,
-  UI.Settings, UI.Modal.PickToken, System.UITypes, NtUtils.Lsa.Sid,
-  Winapi.WinNt, Ntapi.ntdef, Ntapi.ntexapi, Ntapi.ntseapi, Ntapi.ntpebteb,
-  NtUiLib.Exceptions, DelphiUiLib.Strings, DelphiUiLib.Reflection.Strings;
+  UI.Modal.PickUser, TU.Winapi, VirtualTrees, UI.Settings, UI.Modal.PickToken,
+  System.UITypes, NtUtils.Lsa.Sid, Ntapi.WinNt, Ntapi.ntdef, Ntapi.ntexapi,
+  Ntapi.ntseapi, Ntapi.ntpebteb, NtUiLib.Errors, DelphiUiLib.Strings,
+  DelphiUiLib.Reflection.Strings, UI.Builtin.DsObjectPicker;
 
 {$R *.dfm}
 
@@ -99,9 +97,9 @@ begin
   GroupsFrame.Add([NewGroup]);
 
   if BitTest(NewGroup.Attributes and SE_GROUP_OWNER) then
-    ComboOwner.Items.Add(LsaxSidToString(NewGroup.Sid.Data));
+    ComboOwner.Items.Add(LsaxSidToString(NewGroup.Sid));
 
-  ComboPrimary.Items.Add(LsaxSidToString(NewGroup.Sid.Data));
+  ComboPrimary.Items.Add(LsaxSidToString(NewGroup.Sid));
 end;
 
 procedure TDialogCreateToken.ButtonAddSIDClick;
@@ -140,8 +138,7 @@ begin
   // User
   if Source.InfoClass.Query(tdTokenUser) then
   begin
-    ComboUser.Text := LsaxSidToString(
-      Source.InfoClass.User.Sid.Data);
+    ComboUser.Text := LsaxSidToString(Source.InfoClass.User.Sid);
     ComboUserChange(Sender);
     CheckBoxUserState.Checked := BitTest(Source.InfoClass.User.Attributes and
       SE_GROUP_USE_FOR_DENY_ONLY);
@@ -177,12 +174,11 @@ begin
 
   // Owner
   if Source.InfoClass.Query(tdTokenOwner) then
-    ComboOwner.Text := LsaxSidToString(Source.InfoClass.Owner.Data);
+    ComboOwner.Text := LsaxSidToString(Source.InfoClass.Owner);
 
   // Primary group
   if Source.InfoClass.Query(tdTokenPrimaryGroup) then
-    ComboPrimary.Text := LsaxSidToString(
-      Source.InfoClass.PrimaryGroup.Data);
+    ComboPrimary.Text := LsaxSidToString(Source.InfoClass.PrimaryGroup);
 
   // Privileges
   if Source.InfoClass.Query(tdTokenPrivileges) then
@@ -265,8 +261,19 @@ begin
 end;
 
 procedure TDialogCreateToken.ButtonPickUserClick;
+var
+  Account: String;
+  Sid: ISid;
 begin
-  CallObjectPicker(Handle, ObjPickerUserCallback);
+  with ComxCallDsObjectPicker(Handle, Account) do
+    if IsHResult and (HResult = S_FALSE) then
+      Abort
+    else
+      RaiseOnError;
+
+  LsaxLookupNameOrSddl(Account, Sid).RaiseOnError;
+  ComboUser.Text := LsaxSidToString(Sid);
+  ComboUserChange(ButtonPickUser);
 end;
 
 procedure TDialogCreateToken.CheckBoxInfiniteClick;
@@ -301,7 +308,7 @@ end;
 
 constructor TDialogCreateToken.Create;
 begin
-  inherited CreateChild(AOwner, True);
+  inherited CreateChild(AOwner, cfmDesktop);
 end;
 
 procedure TDialogCreateToken.EditSingleGroup;
@@ -325,9 +332,7 @@ begin
   CheckBoxSession.Enabled := RtlGetCurrentPeb.SessionId <> 0;
   ButtonAllocLuidClick(Self);
 
-  GroupsFrame.NodePopupMenu := PopupMenuGroups;
   GroupsFrame.OnDefaultAction := EditSingleGroup;
-
   PrivilegesFrame.ColoringChecked := pcStateBased;
   PrivilegesFrame.ColoringUnChecked := pcRemoved;
   PrivilegesFrame.LoadEvery;
@@ -335,12 +340,12 @@ end;
 
 procedure TDialogCreateToken.MenuDisabledClick;
 begin
-  SetPrivilegesAttributes(0);
+  PrivilegesFrame.AdjustSelected(0);
 end;
 
 procedure TDialogCreateToken.MenuDisabledModifClick;
 begin
-  SetPrivilegesAttributes(SE_PRIVILEGE_ENABLED_BY_DEFAULT);
+  PrivilegesFrame.AdjustSelected(SE_PRIVILEGE_ENABLED_BY_DEFAULT);
 end;
 
 procedure TDialogCreateToken.MenuEditClick;
@@ -369,44 +374,19 @@ end;
 
 procedure TDialogCreateToken.MenuEnabledClick(Sender: TObject);
 begin
- SetPrivilegesAttributes(SE_PRIVILEGE_ENABLED_BY_DEFAULT or
+ PrivilegesFrame.AdjustSelected(SE_PRIVILEGE_ENABLED_BY_DEFAULT or
    SE_PRIVILEGE_ENABLED);
 end;
 
 procedure TDialogCreateToken.MenuEnabledModifClick(Sender: TObject);
 begin
-  SetPrivilegesAttributes(SE_PRIVILEGE_ENABLED);
+  PrivilegesFrame.AdjustSelected(SE_PRIVILEGE_ENABLED);
 end;
 
 procedure TDialogCreateToken.MenuRemoveClick(Sender: TObject);
 begin
-  GroupsFrame.RemoveSelected;
+  GroupsFrame.VST.DeleteSelectedNodes;
   UpdatePrimaryAndOwner(guRemove);
-end;
-
-procedure TDialogCreateToken.ObjPickerUserCallback(UserName: String);
-var
-  Sid: ISid;
-begin
-  LsaxLookupNameOrSddl(UserName, Sid).RaiseOnError;
-  ComboUser.Text := LsaxSidToString(Sid.Data);
-  ComboUserChange(ButtonPickUser);
-end;
-
-procedure TDialogCreateToken.SetPrivilegesAttributes(NewValue: Cardinal);
-var
-  i: Integer;
-begin
-  with PrivilegesFrame.ListViewEx do
-  begin
-    Items.BeginUpdate;
-
-    for i := 0 to Pred(Items.Count) do
-      if Items[i].Selected then
-        PrivilegesFrame.UpdateState(i, NewValue);
-
-    Items.EndUpdate;
-  end;
 end;
 
 procedure TDialogCreateToken.UpdatePrimaryAndOwner(Mode: TGroupUpdateType);
@@ -434,7 +414,7 @@ begin
     // Only groups with Owner flag can be assigned as owners
     for Group in GroupsFrame.All do
       if BitTest(Group.Attributes and SE_GROUP_OWNER) then
-        ComboOwner.Items.Add(LsaxSidToString(Group.Sid.Data));
+        ComboOwner.Items.Add(LsaxSidToString(Group.Sid));
 
     // Restore choise
     if (Mode = guEditOne) and (SavedOwnerCount = ComboOwner.Items.Count) then

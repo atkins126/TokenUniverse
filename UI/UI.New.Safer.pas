@@ -4,7 +4,7 @@ interface
 
 uses
   System.SysUtils, System.Classes, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
-  Vcl.StdCtrls, UI.Prototypes.Forms, TU.Tokens, Winapi.WinSafer;
+  Vcl.StdCtrls, UI.Prototypes.Forms, TU.Tokens, Ntapi.WinSafer;
 
 type
   TDialogSafer = class(TChildForm)
@@ -97,7 +97,7 @@ end;
 constructor TDialogSafer.CreateFromToken(AOwner: TComponent; SrcToken: IToken);
 begin
   Token := SrcToken;
-  inherited CreateChild(AOwner, True);
+  inherited CreateChild(AOwner, cfmDesktop);
   Show;
 end;
 

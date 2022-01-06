@@ -10,8 +10,6 @@ uses
 
 type
   TFormMain = class(TFormEx)
-    Panel1: TPanel;
-    Button1: TButton;
     MainMenu: TMainMenu;
     Program1: TMenuItem;
     View1: TMenuItem;
@@ -67,6 +65,7 @@ type
     MenuSystemAudit: TMenuItem;
     MenuRunProgram: TMenuItem;
     TimerStateCheck: TTimer;
+    RevertCurrentThread: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure ActionDuplicate(Sender: TObject);
     procedure ActionClose(Sender: TObject);
@@ -113,6 +112,7 @@ type
     procedure MenuSystemAuditClick(Sender: TObject);
     procedure MenuRunProgramClick(Sender: TObject);
     procedure CurrentUserChanged(Sender: TObject);
+    procedure ActionRevertCurrentThread(Sender: TObject);
   public
     TokenView: TTokenViewSource;
   end;
@@ -123,13 +123,13 @@ var
 implementation
 
 uses
-  System.UITypes, TU.Tokens.Types, Winapi.WinNt,
+  System.UITypes, TU.Tokens.Types, Ntapi.WinNt,
   NtUtils.Objects.Snapshots, TU.RestartSvc, TU.Suggestions, TU.Tokens,
   UI.Information, UI.ProcessList, UI.HandleSearch, UI.Modal.ComboDlg,
   UI.Restrict, UI.CreateToken, UI.Modal.Columns, UI.Modal.Access,
   UI.Modal.Logon, UI.Modal.AccessAndType, UI.Modal.PickUser, UI.Settings,
   UI.New.Safer, Ntapi.ntpsapi, UI.Audit.System, UI.Process.Run, Ntapi.ntstatus,
-  DelphiUtils.Arrays, NtUiLib.Exceptions, Ntapi.ntseapi, NtUtils,
+  DelphiUtils.Arrays, NtUiLib.Errors, Ntapi.ntseapi, NtUtils,
   NtUiLib.Exceptions.Dialog, UI.Prototypes.Forms;
 
 {$R *.dfm}
@@ -280,11 +280,25 @@ begin
   TDialogRestrictToken.CreateFromToken(Self, TokenView.Selected);
 end;
 
-procedure TFormMain.ActionRevertThread(Sender: TObject);
+procedure TFormMain.ActionRevertCurrentThread(Sender: TObject);
 begin
-  TToken.RevertThreadToken(TProcessListDialog.Execute(Self, True).ThreadID);
+  TToken.RevertThreadToken(NtCurrentThreadId);
 
   CurrentUserChanged(Self);
+  MessageDlg('The token was successfully revoked from the current thread.',
+    mtInformation, [mbOK], 0);
+end;
+
+procedure TFormMain.ActionRevertThread(Sender: TObject);
+var
+  TID: TThreadId;
+begin
+  TID := TProcessListDialog.Execute(Self, True).ThreadID;
+  TToken.RevertThreadToken(TID);
+
+  if TID = NtCurrentThreadId then
+    CurrentUserChanged(Self);
+
   MessageDlg('The token was successfully revoked from the thread.',
     mtInformation, [mbOK], 0);
 end;
@@ -364,8 +378,8 @@ begin
 
   // Open current process and, maybe, its linked token
   with TokenView.Add(TToken.CreateOpenCurrent) do
-    if InfoClass.Query(tdTokenElevation) and
-      (InfoClass.Elevation <> TokenElevationTypeDefault) and
+    if InfoClass.Query(tdTokenElevationType) and
+      (InfoClass.ElevationType <> TokenElevationTypeDefault) and
       OpenLinkedToken(Linked).IsSuccess then
         TokenView.Add(Linked);
 
@@ -449,7 +463,7 @@ end;
 
 procedure TFormMain.SelectColumnsClick(Sender: TObject);
 begin
-  TDialogColumns.Create(Self).ShowModal;
+  TDialogColumns.CreateChild(Self, cfmApplication).ShowModal;
 end;
 
 procedure TFormMain.TokenRestrictSaferClick(Sender: TObject);
@@ -469,7 +483,8 @@ var
   Menu: TMenuItem;
 begin
   for Menu in PopupMenu.Items do
-    if (Menu <> NewMenu) and (Menu <> RevertThread) then
+    if (Menu <> NewMenu) and (Menu <> RevertThread) and
+      (Menu <> RevertCurrentThread) then
       Menu.Enabled := Selected;
 end;
 

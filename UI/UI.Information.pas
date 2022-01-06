@@ -7,7 +7,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Menus,
   Vcl.ComCtrls, Vcl.Buttons, TU.Tokens, System.ImageList, Vcl.ImgList,
   VclEx.ListView, UI.Prototypes, UI.Prototypes.Forms, NtUtils.Security.Sid,
-  TU.Tokens.Types, Winapi.WinNt, UI.Prototypes.AuditFrame, UI.Prototypes.Logon,
+  TU.Tokens.Types, Ntapi.WinNt, UI.Prototypes.AuditFrame, UI.Prototypes.Logon,
   UI.Prototypes.Privileges, UI.Prototypes.Groups, NtUtils.Lsa.Audit,
   Ntapi.ntseapi, NtUtils, Vcl.ExtCtrls;
 
@@ -66,11 +66,11 @@ type
     FrameAudit: TFrameAudit;
     TabLogon: TTabSheet;
     FrameLogon: TFrameLogon;
-    PrivilegesFrame: TPrivilegesFrame;
     StaticAppContainer: TStaticText;
     EditAppContainer: TEdit;
     GroupsRestrictedFrame: TFrameGroups;
     GroupsMemberFrame: TFrameGroups;
+    PrivilegesFrame: TFramePrivileges;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormCreate(Sender: TObject);
     procedure BtnSetIntegrityClick(Sender: TObject);
@@ -112,8 +112,9 @@ type
     procedure ChangedPrimaryGroup(const NewPrimary: ISid);
     procedure ChangedVAllowed(const NewVAllowed: LongBool);
     procedure ChangedVEnabled(const NewVEnabled: LongBool);
+    procedure ChangedElevated(const NewElevated: LongBool);
     procedure ChangedFlags(const NewFlags: Cardinal);
-    procedure SetAuditPolicy(NewAudit: IAudit);
+    procedure SetAuditPolicy(const Audit: TArray<TAuditPolicyEntry>);
     procedure InspectGroup(const Group: TGroup);
     procedure Refresh;
     procedure UpdateObjectTab;
@@ -128,11 +129,11 @@ implementation
 uses
   System.UITypes, UI.MainForm, UI.Colors, UI.ProcessList,
   UI.Information.Access, UI.Sid.View, NtUtils.Processes.Snapshots,
-  NtUtils.Objects.Snapshots, NtUiLib.Exceptions, DelphiUiLib.Strings,
+  NtUtils.Objects.Snapshots, NtUiLib.Errors, DelphiUiLib.Strings,
   DelphiUiLib.Reflection.Strings, NtUiLib.Reflection.AccessMasks,
   Ntapi.ntpsapi, NtUtils.Processes, DelphiUiLib.Reflection,
   NtUtils.Lsa.Sid, DelphiUtils.Arrays, DelphiUiLib.Reflection.Numeric,
-  UI.ProcessIcons, NtUtils.Version, UI.AppContainer.View;
+  UI.ProcessIcons, Ntapi.Versions, UI.AppContainer.View;
 
 const
   TAB_INVALIDATED = 0;
@@ -160,19 +161,19 @@ end;
 
 procedure TInfoDialog.ActionPrivilegeDisable(Sender: TObject);
 begin
-  if PrivilegesFrame.ListViewEx.SelCount <> 0 then
+  if PrivilegesFrame.VST.SelectedCount <> 0 then
     Token.PrivilegeAdjust(PrivilegesFrame.Selected, paDisable);
 end;
 
 procedure TInfoDialog.ActionPrivilegeEnable(Sender: TObject);
 begin
-  if PrivilegesFrame.ListViewEx.SelCount <> 0 then
+  if PrivilegesFrame.VST.SelectedCount <> 0 then
     Token.PrivilegeAdjust(PrivilegesFrame.Selected, paEnable);
 end;
 
 procedure TInfoDialog.ActionPrivilegeRemove(Sender: TObject);
 begin
-  if PrivilegesFrame.ListViewEx.SelCount = 0 then
+  if PrivilegesFrame.VST.SelectedCount = 0 then
     Exit;
 
   if TaskMessageDlg('Remove these privileges from the token?',
@@ -304,6 +305,14 @@ begin
   Caption := Format('Token Information for "%s"', [NewCaption]);
 end;
 
+procedure TInfoDialog.ChangedElevated(const NewElevated: LongBool);
+begin
+  ListViewGeneral.Items[4].SubItems[0] := Format('%s (%s)', [
+      Token.InfoClass.QueryString(tsElevated),
+      Token.InfoClass.QueryString(tsElevationType)
+    ]);
+end;
+
 procedure TInfoDialog.ChangedFlags(const NewFlags: Cardinal);
 begin
   ListViewAdvanced.Items[13].SubItems[0] := Token.InfoClass.QueryString(tsFlags);
@@ -329,9 +338,9 @@ begin
   if Token.InfoClass.Query(tdTokenUser) then
   begin
     ComboOwner.Items.Add(LsaxSidToString(
-      Token.InfoClass.User.Sid.Data));
+      Token.InfoClass.User.Sid));
     ComboPrimary.Items.Add(LsaxSidToString(
-      Token.InfoClass.User.Sid.Data));
+      Token.InfoClass.User.Sid));
   end;
 
   // Add all groups for Primary Group and only those with specific attribtes
@@ -339,10 +348,10 @@ begin
   for i := 0 to High(NewGroups) do
   begin
     ComboPrimary.Items.Add(LsaxSidToString(
-      NewGroups[i].Sid.Data));
+      NewGroups[i].Sid));
     if NewGroups[i].Attributes and SE_GROUP_OWNER <> 0 then
       ComboOwner.Items.Add(LsaxSidToString(
-        NewGroups[i].Sid.Data));
+        NewGroups[i].Sid));
   end;
 
   ComboPrimary.Items.EndUpdate;
@@ -352,14 +361,14 @@ end;
 procedure TInfoDialog.ChangedIntegrity(const NewIntegrity: TGroup);
 begin
   ComboIntegrity.Color := clWindow;
-  IntegritySource.SelectedIntegrity := RtlxRidSid(NewIntegrity.Sid.Data);
+  IntegritySource.SelectedIntegrity := RtlxRidSid(NewIntegrity.Sid);
   ComboIntegrity.Hint := TType.Represent(NewIntegrity).Hint;
 end;
 
 procedure TInfoDialog.ChangedOwner(const NewOwner: ISid);
 begin
   ComboOwner.Color := clWindow;
-  ComboOwner.Text := LsaxSidToString(NewOwner.Data);
+  ComboOwner.Text := LsaxSidToString(NewOwner);
 end;
 
 procedure TInfoDialog.ChangedPolicy(const NewPolicy: Cardinal);
@@ -377,7 +386,7 @@ end;
 procedure TInfoDialog.ChangedPrimaryGroup(const NewPrimary: ISid);
 begin
   ComboPrimary.Color := clWindow;
-  ComboPrimary.Text := LsaxSidToString(NewPrimary.Data);
+  ComboPrimary.Text := LsaxSidToString(NewPrimary);
 end;
 
 procedure TInfoDialog.ChangedPrivileges(const NewPrivileges: TArray<TPrivilege>);
@@ -440,10 +449,9 @@ constructor TInfoDialog.CreateFromToken(AOwner: TComponent; SrcToken: IToken);
 begin
   Assert(Assigned(SrcToken));
   Token := SrcToken;
-  inherited CreateChild(AOwner, True);
+  inherited CreateChild(AOwner, cfmDesktop);
 
   GroupsRestrictedFrame.OnDefaultAction := InspectGroup;
-  GroupsMemberFrame.NodePopupMenu := GroupPopup;
   GroupsMemberFrame.OnDefaultAction := InspectGroup;
   Show;
 end;
@@ -481,6 +489,7 @@ begin
   Token.Events.OnIntegrityChange.Unsubscribe(ChangedIntegrity);
   Token.Events.OnUIAccessChange.Unsubscribe(ChangedUIAccess);
   Token.Events.OnSessionChange.Unsubscribe(ChangedSession);
+  Token.Events.OnElevatedChange.Unsubscribe(ChangedElevated);
   Token.OnCaptionChange.Unsubscribe(ChangedCaption);
   IntegritySource.Free;
   SessionSource.Free;
@@ -500,6 +509,7 @@ begin
   // information that is stored in the event handlers. By doing that in this
   // order we avoid multiple calls while sharing the data between different
   // tokens pointing the same kernel object.
+  Token.Events.OnElevatedChange.Subscribe(ChangedElevated);
   Token.Events.OnSessionChange.Subscribe(ChangedSession);
   Token.Events.OnUIAccessChange.Subscribe(ChangedUIAccess);
   Token.Events.OnIntegrityChange.Subscribe(ChangedIntegrity);
@@ -569,7 +579,6 @@ begin
     Items[1].SubItems[0] := Token.InfoClass.QueryString(tsHandle);
     Items[2].SubItems[0] := Token.InfoClass.QueryString(tsAccess, True);
     Items[3].SubItems[0] := Token.InfoClass.QueryString(tsTokenType);
-    Items[4].SubItems[0] := Token.InfoClass.QueryString(tsElevation);
   end;
   ListViewGeneral.Items.EndUpdate;
 
@@ -588,6 +597,7 @@ begin
   Token.InfoClass.ReQuery(tdTokenIntegrity);
   Token.InfoClass.ReQuery(tdTokenSessionId);
   Token.InfoClass.ReQuery(tdTokenOrigin);
+  Token.InfoClass.ReQuery(tdTokenElevated);
   Token.InfoClass.ReQuery(tdTokenUIAccess);
   Token.InfoClass.ReQuery(tdTokenMandatoryPolicy);
   Token.InfoClass.ReQuery(tdTokenPrivileges);
@@ -621,7 +631,7 @@ begin
           EditAppContainer.Text := 'No'
         else
         begin
-          EditAppContainer.Text := RtlxSidToString(AppContainer.Data);
+          EditAppContainer.Text := RtlxSidToString(AppContainer);
           EditAppContainer.Enabled := True;
         end;
       end;
@@ -635,10 +645,10 @@ begin
   PageControlChange(Self);
 end;
 
-procedure TInfoDialog.SetAuditPolicy(NewAudit: IAudit);
+procedure TInfoDialog.SetAuditPolicy;
 begin
   try
-    Token.InfoClass.AuditPolicy := NewAudit as IPerUserAudit;
+    Token.InfoClass.AuditPolicy := LsaxUserAuditToTokenAudit(Audit);
   finally
     TabAudit.Tag := TAB_INVALIDATED;
     UpdateAuditTab;
@@ -652,13 +662,17 @@ begin
 end;
 
 procedure TInfoDialog.UpdateAuditTab;
+var
+  AuditOverrides: TArray<TAuditPolicyEntry>;
 begin
   if TabAudit.Tag = TAB_UPDATED then
     Exit;
 
   // TODO: Subscribe event
-  if Token.InfoClass.ReQuery(tdTokenAuditPolicy) then
-    FrameAudit.Load(Token.InfoClass.AuditPolicy)
+  if Token.InfoClass.ReQuery(tdTokenAuditPolicy) and
+    LsaxTokenAuditToUserAudit(Token.InfoClass.AuditPolicy.Data,
+    AuditOverrides).IsSuccess then
+    FrameAudit.Load(AuditOverrides)
   else
     FrameAudit.Load(nil);
 

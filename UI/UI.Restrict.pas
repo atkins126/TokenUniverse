@@ -6,7 +6,7 @@ uses
   Winapi.Windows, System.SysUtils, System.Classes, Vcl.Graphics, Vcl.Controls,
   Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Menus, Vcl.ComCtrls, TU.Tokens,
   VclEx.ListView, UI.Prototypes.Forms, UI.Prototypes.Privileges,
-  UI.Prototypes.Groups, NtUtils.Security.Sid, Winapi.WinNt, Ntapi.ntseapi,
+  UI.Prototypes.Groups, NtUtils.Security.Sid, Ntapi.WinNt, Ntapi.ntseapi,
   NtUtils;
 
 type
@@ -23,9 +23,9 @@ type
     TabSheetPrivDelete: TTabSheet;
     ButtonAddSID: TButton;
     CheckBoxUsual: TCheckBox;
-    PrivilegesFrame: TPrivilegesFrame;
     GroupsRestrictFrame: TFrameGroups;
     GroupsDisableFrame: TFrameGroups;
+    PrivilegesFrame: TFramePrivileges;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormCreate(Sender: TObject);
     procedure DoCloseForm(Sender: TObject);
@@ -46,7 +46,7 @@ implementation
 
 uses
   UI.MainForm, System.UITypes, UI.Modal.PickUser, UI.Settings, TU.Suggestions,
-  Winapi.securitybaseapi, UI.Sid.View, DelphiUtils.Arrays, Ntapi.ntrtl;
+  Ntapi.securitybaseapi, UI.Sid.View, DelphiUtils.Arrays, Ntapi.ntrtl;
 
 {$R *.dfm}
 
@@ -142,9 +142,7 @@ end;
 constructor TDialogRestrictToken.CreateFromToken;
 begin
   Token := SrcToken;
-  inherited CreateChild(AOwner, True);
-  GroupsDisableFrame.Checkboxes := True;
-  GroupsRestrictFrame.Checkboxes := True;
+  inherited CreateChild(AOwner, cfmDesktop);
   GroupsDisableFrame.OnDefaultAction := InspectGroup;
   GroupsRestrictFrame.OnDefaultAction := InspectGroup;
   Show;
@@ -185,13 +183,13 @@ begin
   Group.Attributes := SE_GROUP_ENABLED_BY_DEFAULT or SE_GROUP_ENABLED;
 
   // RESTRICTED is useful to provide access to WinSta0 and Default desktop
-  if SddlxGetWellKnownSid(Group.Sid,
-    TWellKnownSidType.WinRestrictedCodeSid).IsSuccess then
+  if SddlxCreateWellKnownSid(TWellKnownSidType.WinRestrictedCodeSid,
+    Group.Sid).IsSuccess then
     ManuallyAdded := ManuallyAdded + [Group];
 
   // WRITE RESTRICTED can also be useful
-  if SddlxGetWellKnownSid(Group.Sid,
-    TWellKnownSidType.WinWriteRestrictedCodeSid).IsSuccess then
+  if SddlxCreateWellKnownSid(TWellKnownSidType.WinWriteRestrictedCodeSid,
+    Group.Sid).IsSuccess then
     ManuallyAdded := ManuallyAdded + [Group];
 
   // Populare groups

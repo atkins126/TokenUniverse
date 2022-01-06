@@ -4,11 +4,11 @@ object DialogPickUser: TDialogPickUser
   Anchors = [akTop]
   BorderIcons = [biSystemMenu]
   Caption = 'Choose user or group'
-  ClientHeight = 288
-  ClientWidth = 294
+  ClientHeight = 181
+  ClientWidth = 567
   Color = clBtnFace
-  Constraints.MinHeight = 225
-  Constraints.MinWidth = 310
+  Constraints.MinHeight = 220
+  Constraints.MinWidth = 570
   DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -21,31 +21,9 @@ object DialogPickUser: TDialogPickUser
   OnCreate = FormCreate
   PixelsPerInch = 96
   TextHeight = 13
-  object ComboBoxSID: TComboBox
-    Left = 8
-    Top = 10
-    Width = 218
-    Height = 21
-    Anchors = [akLeft, akTop, akRight]
-    TabOrder = 0
-    OnChange = ComboBoxSIDChange
-  end
-  object ButtonFilter: TButton
-    Left = 232
-    Top = 6
-    Width = 25
-    Height = 25
-    Hint = 'Filter suggestions'
-    Anchors = [akTop, akRight]
-    ImageIndex = 3
-    ImageMargins.Left = 2
-    ImageMargins.Top = 1
-    Images = FormMain.SmallIcons
-    TabOrder = 5
-  end
   object ButtonOK: TButton
-    Left = 213
-    Top = 257
+    Left = 486
+    Top = 150
     Width = 75
     Height = 25
     Anchors = [akRight, akBottom]
@@ -56,7 +34,7 @@ object DialogPickUser: TDialogPickUser
   end
   object ButtonCancel: TButton
     Left = 8
-    Top = 257
+    Top = 150
     Width = 75
     Height = 25
     Anchors = [akLeft, akBottom]
@@ -65,32 +43,19 @@ object DialogPickUser: TDialogPickUser
     ModalResult = 2
     TabOrder = 4
   end
-  object ButtonPick: TButton
-    Left = 263
-    Top = 6
-    Width = 25
-    Height = 25
-    Hint = 'Use default user selection dialog'
-    Anchors = [akTop, akRight]
-    ImageIndex = 2
-    ImageMargins.Left = 2
-    ImageMargins.Top = 1
-    Images = FormMain.SmallIcons
-    TabOrder = 6
-    OnClick = ButtonPickClick
-  end
   object GroupBoxMain: TGroupBox
     Left = 8
     Top = 37
     Width = 278
-    Height = 100
-    Caption = 'Main attributes '
+    Height = 106
+    Caption = 'Primary attributes '
     TabOrder = 1
     object CheckBoxEnabled: TCheckBox
       Left = 14
       Top = 26
       Width = 130
       Height = 17
+      Hint = 'Makes the group valid for access checks'
       Anchors = [akTop]
       Caption = '&Enabled'
       Checked = True
@@ -103,6 +68,7 @@ object DialogPickUser: TDialogPickUser
       Top = 49
       Width = 130
       Height = 17
+      Hint = 'Denotes the default state; does NOT affect access checks'
       Anchors = [akTop]
       Caption = 'Enabled by &default'
       Checked = True
@@ -115,6 +81,7 @@ object DialogPickUser: TDialogPickUser
       Top = 26
       Width = 120
       Height = 17
+      Hint = 'Mandatory groups cannot be disabled'
       Anchors = [akTop]
       Caption = '&Mandatory'
       TabOrder = 3
@@ -125,6 +92,7 @@ object DialogPickUser: TDialogPickUser
       Top = 49
       Width = 120
       Height = 17
+      Hint = 'The system will consider this group only for denying access'
       Anchors = [akTop]
       Caption = '&Use for deny only'
       TabOrder = 4
@@ -135,71 +103,99 @@ object DialogPickUser: TDialogPickUser
       Top = 72
       Width = 130
       Height = 17
+      Hint = 'Marks the group as a valid token owner'
       Anchors = [akTop]
       Caption = '&Owner'
       TabOrder = 2
     end
   end
   object GroupBoxAdditional: TGroupBox
-    Left = 8
-    Top = 143
-    Width = 278
+    Left = 292
+    Top = 37
+    Width = 267
     Height = 106
+    Hint = 'The system will consider this group only for denying access'
     Caption = 'Additional attributes '
     TabOrder = 2
     object CheckBoxIntegrityEnabled: TCheckBox
-      Left = 14
+      Left = 18
       Top = 48
-      Width = 130
+      Width = 114
       Height = 17
+      Hint = 'Denotes a group as a valid source of token'#39's integrity level'
       Anchors = [akTop]
       Caption = 'Integrity Enabled'
       TabOrder = 1
     end
     object CheckBoxIntegrity: TCheckBox
-      Left = 14
+      Left = 18
       Top = 25
-      Width = 130
+      Width = 114
       Height = 17
+      Hint = 'Does not seem to have any effects'
       Anchors = [akTop]
-      Caption = 'Integrity'
+      Caption = 'I&ntegrity'
       TabOrder = 0
     end
     object CheckBoxResource: TCheckBox
-      Left = 150
+      Left = 144
       Top = 25
-      Width = 120
+      Width = 104
       Height = 17
+      Hint = 'Identifies a domain-local group'
       Anchors = [akTop]
-      Caption = 'Resource'
+      Caption = '&Resource'
       TabOrder = 3
     end
     object CheckBoxLogon: TCheckBox
-      Left = 150
+      Left = 144
       Top = 48
-      Width = 150
+      Width = 104
       Height = 17
+      Hint = 'Marks a group as a Logon SID'
       Anchors = [akTop]
-      Caption = 'Logon ID'
+      Caption = 'Lo&gon ID'
       TabOrder = 4
     end
     object ButtonIntegrity: TButton
-      Left = 14
+      Left = 18
       Top = 71
       Width = 105
       Height = 25
+      Anchors = [akTop]
       Caption = 'Choose &Intrgirty'
       TabOrder = 2
       OnClick = ButtonIntegrityClick
     end
-    object ButtonLogonID: TButton
-      Left = 150
+    object ButtonLogonSID: TButton
+      Left = 144
       Top = 71
-      Width = 105
+      Width = 107
       Height = 25
-      Caption = 'Choose &Logon ID'
-      Enabled = False
+      Hint = 'Copy the logon SID from the current desktop'
+      Anchors = [akTop]
+      Caption = 'Current &Logon SID'
       TabOrder = 5
+      OnClick = ButtonLogonSIDClick
+    end
+  end
+  inline SidEditor: TSidEditor
+    Left = 8
+    Top = 5
+    Width = 553
+    Height = 27
+    Anchors = [akLeft, akTop, akRight]
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 0
+    inherited tbxSid: TEdit
+      Width = 490
+    end
+    inherited btnDsPicker: TButton
+      Left = 525
+    end
+    inherited btnCheatsheet: TButton
+      Left = 497
     end
   end
 end

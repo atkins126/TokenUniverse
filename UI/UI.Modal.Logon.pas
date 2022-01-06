@@ -6,7 +6,7 @@ uses
   System.SysUtils, System.Classes, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   Vcl.StdCtrls, Vcl.Menus, UI.Prototypes.Forms, Vcl.ComCtrls,
   VclEx.ListView, UI.Prototypes, UI.Prototypes.Groups,
-  Winapi.WinBase, Winapi.NtSecApi, Vcl.ExtCtrls, NtUtils;
+  Ntapi.WinBase, Ntapi.NtSecApi, Vcl.ExtCtrls, NtUtils;
 
 type
   TLogonDialog = class(TChildForm)
@@ -34,19 +34,23 @@ type
     procedure FormCreate(Sender: TObject);
     procedure ButtonAllocLuidClick(Sender: TObject);
     procedure ComboLogonTypeChange(Sender: TObject);
+    procedure ButtonCancelClick(Sender: TObject);
   private
     function GetLogonType: TSecurityLogonType;
     procedure EditSingleGroup(const Value: TGroup);
     procedure SuggestCurrentLogonGroup;
+  public
+    constructor Create(AOwner: TComponent); override;
   end;
 
 implementation
 
 uses
   TU.Credentials, TU.Tokens, UI.MainForm, UI.Modal.PickUser,
-  Winapi.WinNt, Ntapi.ntdef, Ntapi.ntexapi, Ntapi.ntseapi, Ntapi.ntrtl,
-  NtUtils.Security.Sid, Winapi.WinUser, NtUtils.WinUser, System.UITypes,
-  NtUiLib.Exceptions, DelphiUiLib.Strings, DelphiUiLib.Reflection.Strings;
+  Ntapi.WinNt, Ntapi.ntdef, Ntapi.ntexapi, Ntapi.ntseapi, Ntapi.ntrtl,
+  NtUtils.Security.Sid, Ntapi.WinUser, NtUtils.WinUser, System.UITypes,
+  NtUiLib.Errors, DelphiUiLib.Strings, DelphiUiLib.Reflection.Strings,
+  Ntapi.ntpsapi;
 
 {$R *.dfm}
 
@@ -55,13 +59,21 @@ const
 
 function IsLogonSid(Sid: ISid): Boolean;
 begin
-  Result := (RtlIdentifierAuthoritySid(Sid.Data).ToInt64 = SECURITY_NT_AUTHORITY_ID)
+  Result := (RtlxIdentifierAuthoritySid(Sid) = SECURITY_NT_AUTHORITY)
     and (RtlSubAuthorityCountSid(Sid.Data)^ = SECURITY_LOGON_IDS_RID_COUNT) and
     (RtlSubAuthoritySid(Sid.Data, 0)^ = SECURITY_LOGON_IDS_RID);
 end;
 
 procedure TLogonDialog.ButtonAddSIDClick;
 begin
+  try
+    if GroupsFrame.VST.RootNodeCount = 0 then
+      SuggestCurrentLogonGroup;
+  except
+    on E: Exception do
+      FormMain.ApplicationEventsException(Self, E)
+  end;
+
   GroupsFrame.Add([TDialogPickUser.PickNew(Self)]);
   ButtonContinue.SetFocus;
 end;
@@ -74,15 +86,15 @@ begin
     EditSourceLuid.Text := IntToHexEx(NewLuid);
 end;
 
+procedure TLogonDialog.ButtonCancelClick;
+begin
+  Close;
+end;
+
 procedure TLogonDialog.ButtonContinueClick;
 var
-  Handle: HWND;
+  Handle: THwnd;
 begin
-  // When logging users with additional groups at least one of them shoud be a
-  // logon group
-  if GroupsFrame.VST.RootNodeCount > 0 then
-    SuggestCurrentLogonGroup;
-
   Handle := FormMain.Handle;
   Enabled := False;
 
@@ -122,6 +134,11 @@ begin
   ButtonAllocLuid.Enabled := EditSourceName.Enabled;
 end;
 
+constructor TLogonDialog.Create;
+begin
+  inherited CreateChild(AOwner, cfmDesktop);
+end;
+
 procedure TLogonDialog.EditSingleGroup;
 begin
   GroupsFrame.EditSelectedGroup(
@@ -135,7 +152,6 @@ end;
 procedure TLogonDialog.FormCreate;
 begin
   ButtonAllocLuidClick(Sender);
-  GroupsFrame.NodePopupMenu := PopupMenu;
   GroupsFrame.OnDefaultAction := EditSingleGroup;
 end;
 
@@ -172,39 +188,33 @@ end;
 
 procedure TLogonDialog.MenuRemoveClick;
 begin
-  GroupsFrame.RemoveSelected;
+  GroupsFrame.VST.DeleteSelectedNodes;
 end;
 
 procedure TLogonDialog.SuggestCurrentLogonGroup;
 const
-  TITLE = 'Add current logon group?';
-  MSG = 'Do you also want to add a logon group that allows full access to ' +
-        'the current window station? Note, that when providing additional ' +
-        'groups, at least one of them must be a logon group.';
+  TITLE = 'Add current logon SID?';
+  MSG = 'Adding groups during logon requires explicitly specifying the logon ' +
+    'SID for the new token. Do you want to copy it from the current ' +
+    'desktop? This operation will allow using the token for starting ' +
+    'interactive processes.';
 var
   Group: TGroup;
 begin
-  // Check for existing logon groups
-  for Group in GroupsFrame.All do
-    if IsLogonSid(Group.Sid) then
-      Exit;
-
   case TaskMessageDlg(TITLE, MSG, mtConfirmation, [mbYes, mbIgnore, mbCancel],
     -1) of
     IDYES:
     begin
-      // Query window station SID
-      UsrxQuerySid(GetProcessWindowStation, Group.Sid).RaiseOnError;
+      UsrxQuerySid(GetThreadDesktop(NtCurrentThreadId), Group.Sid).RaiseOnError;
+
+      if not Assigned(Group.Sid) then
+        raise Exception.Create('The current desktop does not have a logon SID.');
 
       Group.Attributes := SE_GROUP_ENABLED_BY_DEFAULT or
         SE_GROUP_ENABLED or SE_GROUP_LOGON_ID;
 
-      // Add it
       GroupsFrame.Add([Group]);
     end;
-
-    IDCANCEL:
-      Abort;
   end;
 end;
 

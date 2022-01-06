@@ -8,7 +8,6 @@ object LogonDialog: TLogonDialog
   Color = clBtnFace
   Constraints.MinHeight = 320
   Constraints.MinWidth = 266
-  DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -11
@@ -68,6 +67,7 @@ object LogonDialog: TLogonDialog
     Caption = 'Cancel'
     ModalResult = 2
     TabOrder = 4
+    OnClick = ButtonCancelClick
   end
   object ButtonContinue: TButton
     Left = 267
@@ -173,9 +173,10 @@ object LogonDialog: TLogonDialog
       ParentShowHint = False
       ShowHint = True
       TabOrder = 0
-      inherited VST: TVirtualStringTree
+      inherited VST: TVirtualStringTreeEx
         Width = 334
         Height = 212
+        NodePopupMenu = PopupMenu
         Columns = <
           item
             Options = [coAllowClick, coDraggable, coEnabled, coParentBidiMode, coParentColor, coResizable, coVisible, coAutoSpring, coSmartResize, coAllowFocus, coDisableAnimatedResize, coEditable, coStyleColor]
