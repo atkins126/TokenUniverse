@@ -7,7 +7,7 @@ uses
   Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Menus, Vcl.ComCtrls, TU.Tokens,
   VclEx.ListView, UI.Prototypes.Forms, UI.Prototypes.Privileges,
   UI.Prototypes.Groups, NtUtils.Security.Sid, Ntapi.WinNt, Ntapi.ntseapi,
-  NtUtils;
+  NtUtils, TU.Tokens3;
 
 type
   TDialogRestrictToken = class(TChildForm)
@@ -26,7 +26,6 @@ type
     GroupsRestrictFrame: TFrameGroups;
     GroupsDisableFrame: TFrameGroups;
     PrivilegesFrame: TFramePrivileges;
-    procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormCreate(Sender: TObject);
     procedure DoCloseForm(Sender: TObject);
     procedure ButtonOKClick(Sender: TObject);
@@ -34,9 +33,13 @@ type
   private
     Token: IToken;
     ManuallyAdded: TArray<TGroup>;
+    CaptionSubscription: IAutoReleasable;
+    PrivilegesSubscription: IAutoReleasable;
+    GroupsSubscription: IAutoReleasable;
     function GetFlags: Cardinal;
-    procedure ChangedCaption(const NewCaption: String);
-    procedure ChangedGroups(const NewGroups: TArray<TGroup>);
+    procedure ChangedCaption(const InfoClass: TTokenStringClass; const NewCaption: String);
+    procedure ChangedPrivileges(const Status: TNtxStatus; const Privileges: TArray<TPrivilege>);
+    procedure ChangedGroups(const Status: TNtxStatus; const NewGroups: TArray<TGroup>);
     procedure InspectGroup(const Group: TGroup);
   public
     constructor CreateFromToken(AOwner: TComponent; SrcToken: IToken);
@@ -66,6 +69,7 @@ end;
 procedure TDialogRestrictToken.ButtonOKClick;
 var
   NewToken: IToken;
+  GotSabdoxInert: LongBool;
 begin
   NewToken := TToken.CreateRestricted(Token, GetFlags,
     GroupsDisableFrame.Checked,
@@ -75,12 +79,13 @@ begin
   FormMain.TokenView.Add(NewToken);
 
   // Check whether SandboxInert was actually enabled
-  if CheckBoxSandboxInert.Checked then
-    if NewToken.InfoClass.Query(tdTokenSandBoxInert) and
-      not NewToken.InfoClass.SandboxInert then
+  if CheckBoxSandboxInert.Checked and
+    (NewToken as IToken3).QuerySandboxInert(GotSabdoxInert).IsSuccess and
+      not GotSabdoxInert then
       begin
         if not TSettings.NoCloseCreationDialogs then
           Hide;
+
         MessageDlg(NO_SANBOX_INERT, mtWarning, [mbOK], 0);
       end;
 
@@ -95,13 +100,23 @@ end;
 
 procedure TDialogRestrictToken.ChangedGroups;
 var
+  User: TGroup;
   Groups, AlreadyRestricted: TArray<TGroup>;
 begin
+  if not Status.IsSuccess then
+    Exit;
+
   Groups := Copy(NewGroups, 0, Length(NewGroups));
 
   // User can be both disabled and restricted
-  if Token.InfoClass.Query(tdTokenUser) then
-    Groups := Groups + [Token.InfoClass.User];
+  if (Token as IToken3).QueryUser(User).IsSuccess then
+  begin
+    // Zero is a default state here that indicated the enabled one
+    if User.Attributes = 0 then
+      User.Attributes := SE_GROUP_ENABLED or SE_GROUP_ENABLED_BY_DEFAULT;
+
+    Groups := Groups + [User];
+  end;
 
   // Populate disable list
   GroupsDisableFrame.Load(Groups);
@@ -118,9 +133,7 @@ begin
   Groups := Groups + ManuallyAdded;
 
   // Restricting SIDs can include arbitrary groups
-  if Token.InfoClass.Query(tdTokenRestrictedSids) then
-    AlreadyRestricted := Token.InfoClass.RestrictedSids
-  else
+  if not (Token as IToken3).QueryRestrictedSids(AlreadyRestricted).IsSuccess then
     AlreadyRestricted := nil;
 
   // Include already restricted groups as well
@@ -139,6 +152,12 @@ begin
   GroupsRestrictFrame.Checked := AlreadyRestricted;
 end;
 
+procedure TDialogRestrictToken.ChangedPrivileges;
+begin
+  if Status.IsSuccess then
+    PrivilegesFrame.Load(Privileges);
+end;
+
 constructor TDialogRestrictToken.CreateFromToken;
 begin
   Token := SrcToken;
@@ -153,30 +172,22 @@ begin
   Close;
 end;
 
-procedure TDialogRestrictToken.FormClose;
-begin
-  Token.OnCaptionChange.Unsubscribe(ChangedCaption);
-  Token.Events.OnPrivilegesChange.Unsubscribe(PrivilegesFrame.Load);
-  Token.Events.OnGroupsChange.Unsubscribe(ChangedGroups);
-end;
-
 procedure TDialogRestrictToken.FormCreate;
 var
   Group: TGroup;
+  SabdoxInert: LongBool;
 begin
   Assert(Assigned(Token));
 
-  Token.OnCaptionChange.Subscribe(ChangedCaption);
-  ChangedCaption(Token.Caption);
+  CaptionSubscription := (Token as IToken3).ObserveString(tsCaption, ChangedCaption);
 
-  if Token.InfoClass.Query(tdTokenSandBoxInert) then
-    CheckBoxSandboxInert.Checked := Token.InfoClass.SandboxInert;
+  CheckBoxSandboxInert.Checked := (Token as IToken3).QuerySandboxInert(
+    SabdoxInert).IsSuccess and SabdoxInert;
 
   // Privileges
   PrivilegesFrame.ColoringUnChecked := pcStateBased;
   PrivilegesFrame.ColoringChecked := pcRemoved;
-  Token.InfoClass.Query(tdTokenPrivileges);
-  Token.Events.OnPrivilegesChange.Subscribe(PrivilegesFrame.Load, True);
+  PrivilegesSubscription := (Token as IToken3).ObservePrivileges(ChangedPrivileges);
 
   // Craft additional suggestions for restricting list
   SetLength(ManuallyAdded, 0);
@@ -193,8 +204,7 @@ begin
     ManuallyAdded := ManuallyAdded + [Group];
 
   // Populare groups
-  Token.InfoClass.Query(tdTokenGroups);
-  Token.Events.OnGroupsChange.Subscribe(ChangedGroups, True);
+  GroupsSubscription := (Token as IToken3).ObserveGroups(ChangedGroups);
 end;
 
 function TDialogRestrictToken.GetFlags;

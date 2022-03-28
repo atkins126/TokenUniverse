@@ -14,7 +14,6 @@ object DialogSafer: TDialogSafer
   Font.Style = []
   OldCreateOrder = False
   ShowHint = True
-  OnClose = FormClose
   OnCreate = FormCreate
   PixelsPerInch = 96
   TextHeight = 13
@@ -130,7 +129,7 @@ object DialogSafer: TDialogSafer
       'icies for the process with this token.'#13#10#13#10'This action might requ' +
       'ire SeTcbPrivilege to take effect.'
     Anchors = [akLeft, akBottom]
-    Caption = 'Sandbox inert'
+    Caption = 'Sandbox Inert'
     TabOrder = 2
   end
 end

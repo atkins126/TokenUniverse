@@ -4,7 +4,7 @@ interface
 
 uses
   Winapi.Windows, System.SysUtils, System.Classes, Vcl.Controls, Vcl.Forms,
-  Vcl.ComCtrls, Vcl.StdCtrls, Vcl.ImgList, Vcl.AppEvnts,
+  Vcl.ComCtrls, Vcl.StdCtrls, Vcl.ImgList,
   Vcl.ExtCtrls, Vcl.Menus, Vcl.Dialogs, System.ImageList,
   VclEx.ListView, UI.Prototypes, VclEx.Form;
 
@@ -43,7 +43,6 @@ type
     TokenOpenLinked: TMenuItem;
     TokenOpenInfo: TMenuItem;
     SmallIcons: TImageList;
-    ApplicationEvents: TApplicationEvents;
     N1: TMenuItem;
     MenuExit: TMenuItem;
     SelectColumns: TMenuItem;
@@ -83,7 +82,6 @@ type
     procedure ActionOpen(Sender: TObject);
     procedure RunAsSystemClick(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure ApplicationEventsException(Sender: TObject; E: Exception);
     procedure ActionSteal(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure ActionWTSQuery(Sender: TObject);
@@ -130,7 +128,7 @@ uses
   UI.Modal.Logon, UI.Modal.AccessAndType, UI.Modal.PickUser, UI.Settings,
   UI.New.Safer, Ntapi.ntpsapi, UI.Audit.System, UI.Process.Run, Ntapi.ntstatus,
   DelphiUtils.Arrays, NtUiLib.Errors, Ntapi.ntseapi, NtUtils,
-  NtUiLib.Exceptions.Dialog, UI.Prototypes.Forms;
+  NtUiLib.Exceptions.Dialog, UI.Prototypes.Forms, TU.Tokens3;
 
 {$R *.dfm}
 
@@ -139,12 +137,13 @@ uses
 procedure TFormMain.ActionAssignToProcess(Sender: TObject);
 var
   Token: IToken;
+  TokenType: TTokenType;
 begin
   Token := TokenView.Selected;
 
   // Ask the user if he wants to duplicate non-primary tokens
-  if Token.InfoClass.Query(tdTokenType) and
-    (Token.InfoClass.TokenTypeInfo <> ttPrimary) then
+  if (Token as IToken3).QueryType(TokenType).IsSuccess and
+    (TokenType <> TokenPrimary) then
     case TaskMessageDlg(USE_TYPE_MISMATCH, USE_NEED_PRIMARY, mtWarning,
       [mbYes, mbIgnore, mbCancel], -1) of
 
@@ -160,7 +159,8 @@ begin
         ;
     end;
 
-  Token.AssignToProcess(TProcessListDialog.Execute(Self, False).ProcessID);
+  (Token as IToken3).AssignToProcessById(
+    TProcessListDialog.Execute(Self, False).ProcessID).RaiseOnError;
 
   MessageDlg('The token was successfully assigned to the process.',
     mtInformation, [mbOK], 0);
@@ -169,12 +169,13 @@ end;
 procedure TFormMain.ActionAssignToThread(Sender: TObject);
 var
   Token: IToken;
+  TokenType: TTokenType;
 begin
   Token := TokenView.Selected;
 
   // Ask the user if he wants to duplicate primary tokens
-  if Token.InfoClass.Query(tdTokenType) and
-    (Token.InfoClass.TokenTypeInfo = ttPrimary) then
+  if (Token as IToken3).QueryType(TokenType).IsSuccess and
+    (TokenType = TokenPrimary) then
     case TaskMessageDlg(USE_TYPE_MISMATCH, USE_NEED_IMPERSONATION, mtWarning,
       [mbYes, mbIgnore, mbCancel], -1) of
 
@@ -191,9 +192,11 @@ begin
     end;
 
   if TSettings.UseSafeImpersonation then
-    Token.AssignToThreadSafe(TProcessListDialog.Execute(Self, True).ThreadID)
+    (Token as IToken3).AssignToThreadSafeById(TProcessListDialog.Execute(Self,
+      True).ThreadID).RaiseOnError
   else
-    Token.AssignToThread(TProcessListDialog.Execute(Self, True).ThreadID);
+    (Token as IToken3).AssignToThreadById(TProcessListDialog.Execute(Self,
+      True).ThreadID).RaiseOnError;
 
   CurrentUserChanged(Self);
   MessageDlg('The token was successfully assigned to the thread.',
@@ -340,11 +343,6 @@ begin
   TokenView.Add(TToken.CreateQueryWts(TComboDialog.PickSession(Self)));
 end;
 
-procedure TFormMain.ApplicationEventsException(Sender: TObject; E: Exception);
-begin
-  ShowNtxException(Application.Handle, E);
-end;
-
 procedure TFormMain.CurrentUserChanged(Sender: TObject);
 begin
   if Active or (Sender <> TimerStateCheck) then
@@ -353,12 +351,14 @@ end;
 
 procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  TFormEvents.OnMainFormClose.Invoke(Self);
+  TFormEvents.OnMainFormClose.Invoke;
   TokenView.Free;
 end;
 
 procedure TFormMain.FormCreate(Sender: TObject);
 var
+  Token: IToken;
+  Elevation: TTokenElevationInfo;
   Handles: TArray<TProcessHandleEntry>;
   Linked: IToken;
   i: integer;
@@ -376,12 +376,13 @@ begin
       TokenView.Add(TToken.CreateByHandle(Handles[i].HandleValue));
   end;
 
+  Token := TokenView.Add(TToken.CreateOpenCurrent);
+
   // Open current process and, maybe, its linked token
-  with TokenView.Add(TToken.CreateOpenCurrent) do
-    if InfoClass.Query(tdTokenElevationType) and
-      (InfoClass.ElevationType <> TokenElevationTypeDefault) and
-      OpenLinkedToken(Linked).IsSuccess then
-        TokenView.Add(Linked);
+  if (Token as IToken3).QueryElevation(Elevation).IsSuccess and
+    (Elevation.ElevationType <> TokenElevationTypeDefault) and
+    Token.OpenLinkedToken(Linked).IsSuccess then
+      TokenView.Add(Linked);
 
   SetForegroundWindow(Handle);
 end;
@@ -468,7 +469,7 @@ end;
 
 procedure TFormMain.TokenRestrictSaferClick(Sender: TObject);
 begin
-  TDialogSafer.CreateFromToken(Self, TokenView.Selected);
+  TDialogSafer.CreateFromToken(Self, TokenView.Selected as IToken3);
 end;
 
 procedure TFormMain.ListViewTokensEdited(Sender: TObject; Item: TListItem;

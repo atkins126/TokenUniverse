@@ -7,7 +7,7 @@ uses
   Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, UI.Prototypes.Forms,
   Vcl.ExtCtrls, Vcl.Menus, TU.Tokens, NtUtils.Environment,
   NtUtils.Objects, Ntapi.WinUser, NtUtils, Ntapi.ProcessThreadsApi,
-  NtUtils.Processes.Create, Ntapi.ntpsapi;
+  NtUtils.Processes.Create, Ntapi.ntpsapi, TU.Tokens3;
 
 type
   TDialogRun = class(TChildForm)
@@ -50,6 +50,7 @@ type
     ComboMethod: TComboBox;
     LabelMethod: TLabel;
     Label1: TLabel;
+    CheckBoxForceBreakaway: TCheckBox;
     procedure MenuSelfClick(Sender: TObject);
     procedure MenuCmdClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
@@ -71,8 +72,9 @@ type
     ParentAccessMask: TProcessAccessMask;
     hxParentProcess: IHandle;
     AppContainerSid: ISid;
+    CaptionSubscription: IAutoReleasable;
     procedure UpdateEnabledState;
-    procedure OnCaptionChange(const NewCaption: String);
+    procedure OnCaptionChange(const InfoClass: TTokenStringClass; const NewCaption: String);
     procedure SetToken(const Value: IToken);
     procedure UpdateDesktopList;
   public
@@ -157,6 +159,9 @@ begin
 
   if CheckBoxBreakaway.Checked then
     Include(Options.Flags, poBreakawayFromJob);
+
+  if CheckBoxForceBreakaway.Checked then
+    Include(Options.Flags, poForceBreakaway);
 
   if CheckBoxSuspended.Checked then
     Include(Options.Flags, poSuspended);
@@ -312,25 +317,19 @@ begin
   ButtonRun.SetFocus;
 end;
 
-procedure TDialogRun.OnCaptionChange(const NewCaption: String);
+procedure TDialogRun.OnCaptionChange;
 begin
   LinkLabelToken.Caption := 'Using token: <a>' + NewCaption + '</a>';
 end;
 
 procedure TDialogRun.SetToken(const Value: IToken);
 begin
-  if Assigned(FToken) then
-    FToken.OnCaptionChange.Unsubscribe(OnCaptionChange);
-
   FToken := Value;
 
   if not Assigned(Value) then
     LinkLabelToken.Caption := 'Using token: <not specified>'
   else
-  begin
-    Value.OnCaptionChange.Subscribe(OnCaptionChange);
-    OnCaptionChange(Value.Caption);
-  end;
+    CaptionSubscription := (Value as IToken3).ObserveString(tsCaption, OnCaptionChange);
 end;
 
 procedure TDialogRun.UpdateDesktopList;
@@ -383,6 +382,7 @@ begin
   CheckBoxInherit.Enabled := ppInheritHandles in SupportedOptions;
   CheckBoxSuspended.Enabled := ppCreateSuspended in SupportedOptions;
   CheckBoxBreakaway.Enabled := ppBreakaway in SupportedOptions;
+  CheckBoxForceBreakaway.Enabled := ppForceBreakaway in SupportedOptions;
   CheckBoxNewConsole.Enabled := ppNewConsole in SupportedOptions;
   CheckBoxRunas.Enabled := ppRequireElevation in SupportedOptions;
   ComboBoxShowMode.Enabled := ppShowWindowMode in SupportedOptions;
