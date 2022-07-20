@@ -19,7 +19,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     procedure ClearAll;
-    function AddToken(Token: IToken; Group: Integer = 0): IToken;
+    function AddToken(const Token: IToken; Group: Integer = 0): IToken;
     procedure DeleteToken(Item: TListItemEx; SelectNext: Boolean = False);
     procedure RenameToken(NewName: String; Item: TListItemEx);
     function GetSelectedToken: IToken;
@@ -29,11 +29,11 @@ type
 implementation
 
 uses
-  TU.Tokens.Types, TU.Tokens3;
+  TU.Tokens.Old.Types;
 
 {$R *.dfm}
 
-function TFrameTokenList.AddToken(Token: IToken; Group: Integer): IToken;
+function TFrameTokenList.AddToken;
 var
   Item: TListItemEx;
 begin
@@ -48,12 +48,12 @@ begin
   Item.GroupID := Group;
   Item.Data := Pointer(Group);
 
-  Item.SubItems.Add((Token as IToken3).QueryString(tsType));
-  Item.SubItems.Add((Token as IToken3).QueryString(tsAccess));
-  Item.SubItems.Add((Token as IToken3).QueryString(tsUser));
-  Item.SubItems.Add((Token as IToken3).QueryString(tsSessionId));
-  Item.SubItems.Add((Token as IToken3).QueryString(tsElevation));
-  Item.SubItems.Add((Token as IToken3).QueryString(tsIntegrity));
+  Item.SubItems.Add(Token.QueryString(tsType));
+  Item.SubItems.Add(Token.QueryString(tsAccess));
+  Item.SubItems.Add(Token.QueryString(tsUser));
+  Item.SubItems.Add(Token.QueryString(tsSessionId));
+  Item.SubItems.Add(Token.QueryString(tsElevation));
+  Item.SubItems.Add(Token.QueryString(tsIntegrity));
 
   ListViewTokens.Items.EndUpdate;
 end;
@@ -65,7 +65,7 @@ begin
   SearchBox.Text := '';
 end;
 
-constructor TFrameTokenList.Create(AOwner: TComponent);
+constructor TFrameTokenList.Create;
 var
   i: integer;
 begin
@@ -74,8 +74,7 @@ begin
     ComboBoxColumn.Items.Add(ListViewTokens.Columns[i].Caption);
 end;
 
-procedure TFrameTokenList.DeleteToken(Item: TListItemEx;
-  SelectNext: Boolean = False);
+procedure TFrameTokenList.DeleteToken;
 begin
   Item.Delete;
 
@@ -83,7 +82,7 @@ begin
     ListViewTokens.Items[OriginalIndex].Selected := True;}
 end;
 
-function TFrameTokenList.GetSelectedToken: IToken;
+function TFrameTokenList.GetSelectedToken;
 begin
   if Assigned(ListViewTokens.Selected) then
     Result := IToken(ListViewTokens.Selected.OwnedIData)
@@ -91,18 +90,18 @@ begin
     Result := nil;
 end;
 
-function TFrameTokenList.GetToken(Item: TListItemEx): IToken;
+function TFrameTokenList.GetToken;
 begin
   Result := IToken(Item.OwnedIData);
 end;
 
-procedure TFrameTokenList.RenameToken(NewName: String; Item: TListItemEx);
+procedure TFrameTokenList.RenameToken;
 begin
-  IToken3(Item.OwnedIData).Caption := NewName;
+  IToken(Item.OwnedIData).Caption := NewName;
   Item.Caption := NewName; // TODO: move to OnCaptionChange
 end;
 
-procedure TFrameTokenList.SearchBoxChange(Sender: TObject);
+procedure TFrameTokenList.SearchBoxChange;
 var
   SearchPattern: String;
   i: Integer;
@@ -121,7 +120,7 @@ begin
         GroupID := -1;
 end;
 
-procedure TFrameTokenList.SearchBoxRightButtonClick(Sender: TObject);
+procedure TFrameTokenList.SearchBoxRightButtonClick;
 begin
   SearchBox.Text := '';
 end;

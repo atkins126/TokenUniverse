@@ -17,19 +17,19 @@ type
     GroupBoxAccess: TGroupBox;
     AccessMaskFrame: TAccessMaskFrame;
   public
-    class function ExecuteDuplication(AOwner: TComponent; Source: IToken):
+    class function ExecuteDuplication(AOwner: TComponent; const Source: IToken):
       IToken;
   end;
 
 implementation
 
 uses
-   TU.Tokens.Types, Ntapi.ntseapi, Ntapi.ntobapi, TU.Tokens3, NtUtils;
+   TU.Tokens.Old.Types, Ntapi.ntseapi, Ntapi.ntobapi, NtUtils,
+   TU.Tokens.Open, NtUiLib.Errors;
 
 {$R *.dfm}
 
-class function TDialogAccess.ExecuteDuplication(AOwner: TComponent;
-  Source: IToken): IToken;
+class function TDialogAccess.ExecuteDuplication;
 var
   BasicInfo: TObjectBasicInformation;
 begin
@@ -37,13 +37,13 @@ begin
   begin
     AccessMaskFrame.LoadType(TypeInfo(TTokenAccessMask), TokenGenericMapping);
 
-    if (Source as IToken3).QueryBasicInfo(BasicInfo).IsSuccess then
+    if Source.QueryBasicInfo(BasicInfo).IsSuccess then
       AccessMaskFrame.AccessMask := BasicInfo.GrantedAccess;
 
     ShowModal;
 
-    Result := TToken.CreateDuplicateHandle(Source, AccessMaskFrame.AccessMask,
-      RadioButtonSame.Checked);
+    MakeDuplicateHandle(Result, Source, AccessMaskFrame.AccessMask,
+      RadioButtonSame.Checked).RaiseOnError;
   end;
 end;
 

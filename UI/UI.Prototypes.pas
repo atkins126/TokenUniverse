@@ -4,7 +4,7 @@ interface
 
 uses
   System.SysUtils, Vcl.ComCtrls, Vcl.StdCtrls, VclEx.ListView, TU.Tokens,
-  TU.Tokens.Types, Ntapi.WinNt, NtUtils.WinStation, TU.Tokens3, NtUtils;
+  TU.Tokens.Old.Types, Ntapi.WinNt, NtUtils.WinStation, NtUtils;
 
 type
   TSessionSource = class
@@ -73,7 +73,7 @@ type
     Item: TListItemEx;
     Owner: TTokenViewSource;
     CaptionSubscription: IAutoReleasable;
-    constructor Create(Token: IToken; Owner: TTokenViewSource);
+    constructor Create(const Token: IToken; Owner: TTokenViewSource);
     destructor Destroy; override;
   end;
 
@@ -85,7 +85,7 @@ type
     function GetCount: Integer;
   public
     constructor Create(OwnedListView: TListViewEx);
-    function Add(Token: IToken): IToken;
+    function Add(const Token: IToken): IToken;
     procedure Delete(Index: Integer);
     function Selected: IToken;
     property Count: Integer read GetCount;
@@ -100,16 +100,19 @@ uses
   NtUtils.Lsa.Logon, NtUtils.Lsa.Sid, DelphiUiLib.Strings,
   DelphiUiLib.Reflection.Strings, DelphiUiLib.Reflection;
 
+{$BOOLEVAL OFF}
+{$IFOPT R+}{$DEFINE R+}{$ENDIF}
+{$IFOPT Q+}{$DEFINE Q+}{$ENDIF}
+
 { TSessionSource }
 
-constructor TSessionSource.Create(OwnedComboBox: TComboBox;
-  SelectCurrent: Boolean);
+constructor TSessionSource.Create;
 begin
   ComboBox := OwnedComboBox;
   RefreshSessionList(SelectCurrent);
 end;
 
-function TSessionSource.GetSession: Cardinal;
+function TSessionSource.GetSession;
 begin
   Assert(Assigned(ComboBox));
 
@@ -119,7 +122,7 @@ begin
     Result := Sessions[ComboBox.ItemIndex].SessionId;
 end;
 
-procedure TSessionSource.RefreshSessionList(SelectCurrent: Boolean);
+procedure TSessionSource.RefreshSessionList;
 var
   i: Integer;
 begin
@@ -143,7 +146,7 @@ begin
   ComboBox.Items.EndUpdate;
 end;
 
-procedure TSessionSource.SetSession(const Value: Cardinal);
+procedure TSessionSource.SetSession;
 var
   i: Integer;
 begin
@@ -164,7 +167,7 @@ end;
 
 { TIntegritySource }
 
-constructor TIntegritySource.Create(OwnedComboBox: TComboBox);
+constructor TIntegritySource.Create;
 begin
   ComboBox := OwnedComboBox;
   RefreshList;
@@ -214,7 +217,7 @@ begin
   end;
 end;
 
-procedure TIntegritySource.SetIntegrity(Value: Cardinal);
+procedure TIntegritySource.SetIntegrity;
 begin
   Assert(Assigned(ComboBox));
 
@@ -281,8 +284,7 @@ end;
 
 { TAccessMaskSource }
 
-class function TAccessMaskSource.GetAccessMask(
-  ListView: TListView): TAccessMask;
+class function TAccessMaskSource.GetAccessMask;
 var
   i: integer;
 begin
@@ -294,8 +296,7 @@ begin
       Result := Result or AccessValues[i];
 end;
 
-class procedure TAccessMaskSource.InitAccessEntries(ListView: TListView;
-  Access: TAccessMask);
+class procedure TAccessMaskSource.InitAccessEntries;
 var
   i: integer;
   AccessGroup: TAccessGroup;
@@ -321,13 +322,13 @@ end;
 
 { TLogonSessionSource }
 
-constructor TLogonSessionSource.Create(OwnedComboBox: TComboBox);
+constructor TLogonSessionSource.Create;
 begin
   ComboBox := OwnedComboBox;
   UpdateLogonSessions;
 end;
 
-function TLogonSessionSource.GetSelected: TLuid;
+function TLogonSessionSource.GetSelected;
 begin
   Assert(ComboBox.Items.Count = Length(FLogonSessions));
 
@@ -336,15 +337,15 @@ begin
     if ComboBox.Text = NO_LOGON then
       Result := 0
     else
-    {$R-}
+    {$Q-}{$R-}
       Result := TLuid(StrToUInt64Ex(ComboBox.Text, 'logon ID'));
-    {$R+}
+    {$IFDEF R+}{$R+}{$ENDIF}{$IFDEF Q+}{$Q+}{$ENDIF}
   end
   else
     Result := FLogonSessions[ComboBox.ItemIndex];
 end;
 
-procedure TLogonSessionSource.SetSelected(const Value: TLuid);
+procedure TLogonSessionSource.SetSelected;
 var
   i: integer;
 begin
@@ -382,13 +383,13 @@ end;
 
 { TCellSource }
 
-constructor TCellSource.Create(Row: TRowSource; ColumnIndex: Integer);
+constructor TCellSource.Create;
 begin
   Self.Row := Row;
   Self.ColumnIndex := ColumnIndex;
 
   // Each cell subscribes corresponding string querying event
-  Subscription := (Row.Token as IToken3).ObserveString(
+  Subscription := Row.Token.ObserveString(
     Row.Owner.DataClasses[ColumnIndex], SetTextCallback);
 end;
 
@@ -400,7 +401,7 @@ end;
 
 { TRowSource }
 
-constructor TRowSource.Create(Token: IToken; Owner: TTokenViewSource);
+constructor TRowSource.Create;
 var
   i: integer;
 begin
@@ -412,8 +413,7 @@ begin
   Item.OwnedData := Self;
 
   // Subscribe main column updates
-  CaptionSubscription := (Token as IToken3).ObserveString(tsCaption,
-    TokenCaptionCallback);
+  CaptionSubscription := Token.ObserveString(tsCaption, TokenCaptionCallback);
 
   // Initialize sources for all other columns
   SetLength(Cells, Length(Owner.DataClasses));
@@ -442,7 +442,7 @@ end;
 
 { TTokenViewSource }
 
-function TTokenViewSource.Add(Token: IToken): IToken;
+function TTokenViewSource.Add;
 begin
   // This will create a new ListView Item and assign this object
   // as it's OwnedData
@@ -450,7 +450,7 @@ begin
   Result := Token;
 end;
 
-constructor TTokenViewSource.Create(OwnedListView: TListViewEx);
+constructor TTokenViewSource.Create;
 var
   tsc: TTokenStringClass;
   ColumnCount: Integer;
@@ -493,7 +493,7 @@ begin
   end;
 end;
 
-procedure TTokenViewSource.Delete(Index: Integer);
+procedure TTokenViewSource.Delete;
 begin
   // This will delete the item, the assiciated row object, unsubscribe
   // all column events and close the token
@@ -506,19 +506,19 @@ begin
   inherited;
 end;
 
-function TTokenViewSource.GetCount: Integer;
+function TTokenViewSource.GetCount;
 begin
   Assert(Assigned(ListView));
   Result := ListView.Items.Count;
 end;
 
-function TTokenViewSource.GetToken(Ind: Integer): IToken;
+function TTokenViewSource.GetToken;
 begin
   Assert(Assigned(ListView));
   Result := (ListView.Items[Ind].OwnedData as TRowSource).Token;
 end;
 
-function TTokenViewSource.Selected: IToken;
+function TTokenViewSource.Selected;
 begin
   if Assigned(ListView.Selected) then
     Result := (ListView.Selected.OwnedData as TRowSource).Token

@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes,
   Vcl.Controls, Vcl.Forms, Vcl.StdCtrls, Vcl.ComCtrls, TU.Tokens,
-  UI.Prototypes.Forms, VclEx.ListView, TU.Tokens.Types,
+  UI.Prototypes.Forms, VclEx.ListView, TU.Tokens.Old.Types,
   UI.Prototypes.AccessMask;
 
 type
@@ -30,14 +30,14 @@ type
   public
     property SelectedTokenType: TTokenTypeEx read FSelectedType write
       SetSelectedType;
-    class function ExecuteDuplication(AOwner: TComponent; Source: IToken):
+    class function ExecuteDuplication(AOwner: TComponent; const Source: IToken):
       IToken;
   end;
 
 implementation
 
 uses
-  Ntapi.ntseapi, TU.Tokens3, NtUtils;
+  Ntapi.ntseapi, NtUtils, TU.Tokens.Open, NtUiLib.Errors;
 
 {$R *.dfm}
 
@@ -51,14 +51,13 @@ begin
   FSelectedType := ttPrimary;
 end;
 
-class function TDialogAccessAndType.ExecuteDuplication(AOwner: TComponent;
-  Source: IToken): IToken;
+class function TDialogAccessAndType.ExecuteDuplication;
 var
   Statistics: TTokenStatistics;
 begin
   with TDialogAccessAndType.CreateChild(AOwner, cfmApplication) do
   begin
-    if (Source as IToken3).QueryStatistics(Statistics).IsSuccess then
+    if Source.QueryStatistics(Statistics).IsSuccess then
     begin
       if Statistics.TokenType = TokenPrimary then
         SelectedTokenType := ttPrimary
@@ -68,12 +67,12 @@ begin
 
     ShowModal;
 
-    Result := TToken.CreateDuplicateToken(Source, AccessMaskFrame.AccessMask,
-      SelectedTokenType, CheckBoxEffective.Checked);
+    MakeDuplicateToken(Result, Source, SelectedTokenType,
+      AccessMaskFrame.AccessMask, CheckBoxEffective.Checked).RaiseOnError;
   end;
 end;
 
-procedure TDialogAccessAndType.SetSelectedType(const Value: TTokenTypeEx);
+procedure TDialogAccessAndType.SetSelectedType;
 begin
   RadioButtonAnonymous.Checked := (Value = ttAnonymous);
   RadioButtonIdentification.Checked := (Value = ttIdentification);

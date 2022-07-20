@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.Menus, Vcl.StdCtrls, Vcl.ComCtrls,
-  UI.TokenListFrame, VclEx.ListView, UI.Prototypes.Forms;
+  UI.TokenListFrame, VclEx.ListView, UI.Prototypes.Forms, TU.Tokens;
 
 type
   TFormHandleSearch = class(TChildForm)
@@ -28,7 +28,7 @@ type
 implementation
 
 uses
-  System.UITypes, UI.MainForm, UI.Information, TU.Tokens,
+  System.UITypes, UI.MainForm, UI.Information,
   Ntapi.WinNt, Ntapi.ntpebteb, NtUtils, NtUtils.Objects.Snapshots,
   NtUiLib.Errors, DelphiUtils.Arrays, NtUtils.Processes,
   NtUtils.Processes.Info, NtUtils.Objects;
@@ -40,7 +40,7 @@ begin
   Close;
 end;
 
-procedure TFormHandleSearch.ButtonRefreshClick(Sender: TObject);
+procedure TFormHandleSearch.ButtonRefreshClick;
 var
   Handles: TArray<TSystemHandleEntry>;
   PerProcess: TArray<TArrayGroup<TProcessId, TSystemHandleEntry>>;
@@ -105,7 +105,7 @@ begin
         // Try to get a copy
         if Assigned(hxProcess) and NtxDuplicateHandleFrom(hxProcess.Handle,
           PerProcess[i].Values[j].HandleValue, hxToken).IsSuccess then
-          Frame.AddToken(TToken.Create(hxToken, Format('Handle %d @ %s',
+          Frame.AddToken(CaptureTokenHandle(hxToken, Format('Handle %d @ %s',
             [PerProcess[i].Values[j].HandleValue, ImageName])), Index);
       end;
     end;
@@ -115,13 +115,13 @@ begin
   Frame.ListViewTokens.Items.EndUpdate;
 end;
 
-procedure TFormHandleSearch.cmInspectClick(Sender: TObject);
+procedure TFormHandleSearch.cmInspectClick;
 begin
   if Assigned(Frame.GetSelectedToken()) then
     TInfoDialog.CreateFromToken(FormMain, Frame.GetSelectedToken);
 end;
 
-procedure TFormHandleSearch.cmSaveClick(Sender: TObject);
+procedure TFormHandleSearch.cmSaveClick;
 begin
   if Assigned(Frame.GetSelectedToken()) then
     FormMain.TokenView.Add(Frame.GetSelectedToken);

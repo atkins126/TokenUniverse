@@ -5,7 +5,6 @@ uses
   NtUtils,
   NtUtils.Svc.SingleTaskSvc,
   NtUiLib.Errors,
-  TU.Tokens in 'Core\TU.Tokens.pas',
   UI.TokenListFrame in 'UI\UI.TokenListFrame.pas' {FrameTokenList: TFrame},
   UI.MainForm in 'UI\UI.MainForm.pas' {FormMain},
   UI.Modal.AccessAndType in 'UI\UI.Modal.AccessAndType.pas' {DialogAccessAndType},
@@ -20,7 +19,7 @@ uses
   UI.Modal.Logon in 'UI\UI.Modal.Logon.pas' {LogonDialog},
   UI.Modal.PickUser in 'UI\UI.Modal.PickUser.pas' {DialogPickUser},
   UI.CreateToken in 'UI\UI.CreateToken.pas' {DialogCreateToken},
-  TU.Tokens.Types in 'Core\TU.Tokens.Types.pas',
+  TU.Tokens.Old.Types in 'Core\TU.Tokens.Old.Types.pas',
   UI.Modal.Columns in 'UI\UI.Modal.Columns.pas' {DialogColumns},
   UI.Settings in 'UI\UI.Settings.pas',
   UI.Modal.Access in 'UI\UI.Modal.Access.pas' {DialogAccess},
@@ -56,13 +55,16 @@ uses
   UI.Prototypes.Sid.Edit in 'NtUtilsUI\Prototypes\UI.Prototypes.Sid.Edit.pas' {SidEditor: TFrame},
   UI.Prototypes.Acl in 'NtUtilsUI\Prototypes\UI.Prototypes.Acl.pas' {FrameAcl: TFrame},
   TU.Observers in 'Core\TU.Observers.pas',
-  TU.Tokens3.Events in 'Core\TU.Tokens3.Events.pas',
-  TU.Tokens3 in 'Core\TU.Tokens3.pas',
+  TU.Tokens.Events in 'Core\TU.Tokens.Events.pas',
+  TU.Tokens in 'Core\TU.Tokens.pas',
   UI.Exceptions in 'NtUtilsUI\Common\UI.Exceptions.pas',
   TU.Events in 'Core\TU.Events.pas',
   VirtualTreesEx.DefaultMenu in 'NtUtilsUI\Components\VirtualTreesEx.DefaultMenu.pas',
   DevirtualizedTree.Provider in 'NtUtilsUI\Components\DevirtualizedTree.Provider.pas',
-  DevirtualizedTree in 'NtUtilsUI\Components\DevirtualizedTree.pas';
+  DevirtualizedTree in 'NtUtilsUI\Components\DevirtualizedTree.pas',
+  TU.Tokens.Open in 'Core\TU.Tokens.Open.pas',
+  UI.New.TokenFrame in 'UI\UI.New.TokenFrame.pas' {FrameTokens: TFrame},
+  TU.AccountRights in 'Core\TU.AccountRights.pas';
 
 {$R *.res}
 

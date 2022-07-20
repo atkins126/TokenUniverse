@@ -5,7 +5,7 @@ interface
 uses
   System.SysUtils, System.Classes, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   Vcl.StdCtrls, UI.Prototypes.Forms, Ntapi.WinSafer, NtUtils,
-  TU.Tokens3;
+  TU.Tokens;
 
 type
   TDialogSafer = class(TChildForm)
@@ -25,20 +25,20 @@ type
     procedure ButtonOKClick(Sender: TObject);
     procedure ComboBoxLevelChange(Sender: TObject);
   private
-    Token: IToken3;
+    Token: IToken;
     CaptionSubscripion: IAutoReleasable;
     function GetScopeId: TSaferScopeId;
     function GetLevelId: TSaferLevelId;
     procedure ChangedCaption(const InfoClass: TTokenStringClass; const NewCaption: String);
   public
-    constructor CreateFromToken(AOwner: TComponent; const SrcToken: IToken3);
+    constructor CreateFromToken(AOwner: TComponent; const SrcToken: IToken);
   end;
 
 implementation
 
 uses
   UI.Settings, UI.MainForm, TU.Suggestions, System.UITypes,
-  NtUtils.WinSafer, NtUiLib.Errors, TU.Tokens;
+  NtUtils.WinSafer, NtUiLib.Errors;
 
 {$R *.dfm}
 
@@ -54,7 +54,6 @@ var
   hxNewToken: IHandle;
   NewToken: IToken;
   LevelName: String;
-  SandboxInert: LongBool;
 begin
   SafexComputeSaferTokenById(hxNewToken, Token.Handle, GetScopeId, GetLevelId,
     CheckBoxSandboxInert.Checked).RaiseOnError;
@@ -78,21 +77,13 @@ begin
     LevelName := 'Unknown';
   end;
 
-  NewToken := TToken.Create(hxNewToken, LevelName + ' Safer for ' +
+  NewToken := CaptureTokenHandle(hxNewToken, LevelName + ' Safer for ' +
     Token.Caption);
 
   FormMain.TokenView.Add(NewToken);
 
-  // Check whether Sandbox Inert was actually enabled
-  if CheckBoxSandboxInert.Checked and
-    (NewToken as IToken3).QuerySandboxInert(SandboxInert).IsSuccess and
-    not SandboxInert then
-  begin
-    if not TSettings.NoCloseCreationDialogs then
-      Hide;
-
-    MessageDlg(NO_SANBOX_INERT, mtWarning, [mbOK], 0);
-  end;
+  if CheckBoxSandboxInert.Checked then
+    CheckSandboxInert(Handle, NewToken);
 
   if not TSettings.NoCloseCreationDialogs then
     Close;
@@ -135,8 +126,7 @@ begin
   if not Assigned(Token) then
     raise EAccessViolation.Create('Token is not set');
 
-  CaptionSubscripion := (Token as IToken3).ObserveString(tsCaption,
-    ChangedCaption);
+  CaptionSubscripion := Token.ObserveString(tsCaption, ChangedCaption);
 
   CheckBoxSandboxInert.Checked := Token.QuerySandboxInert(
     SandboxInert).IsSuccess and SandboxInert;

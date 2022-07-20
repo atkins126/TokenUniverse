@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils,
   System.Classes, Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
-  Vcl.StdCtrls, UI.Prototypes, UI.Prototypes.Forms, TU.Tokens.Types;
+  Vcl.StdCtrls, UI.Prototypes, UI.Prototypes.Forms, TU.Tokens.Old.Types;
 
 type
   TComboDialog = class(TChildForm)
@@ -25,7 +25,7 @@ implementation
 
 { TSessionDialog }
 
-class function TComboDialog.PickSession(AOwner: TComponent): Cardinal;
+class function TComboDialog.PickSession;
 var
   SessionSource: TSessionSource;
 begin

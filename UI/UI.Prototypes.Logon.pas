@@ -41,7 +41,7 @@ implementation
 uses
   Vcl.Graphics, UI.Colors, DelphiUiLib.Strings, NtUtils.Security.Sid,
   Ntapi.NtSecApi, DelphiUiLib.Reflection.Records, DelphiUiLib.Reflection,
-  TU.Tokens3, NtUiLib.Errors;
+  NtUiLib.Errors;
 
 {$R *.dfm}
 
@@ -52,39 +52,39 @@ const
 
 { TFrameLogon }
 
-procedure TFrameLogon.BtnSetOriginClick(Sender: TObject);
+procedure TFrameLogon.BtnSetOriginClick;
 var
   Status: TNtxStatus;
 begin
   Assert(Assigned(Token));
-  Status := (Token as IToken3).SetOrigin(LogonSource.SelectedLogonSession);
+  Status := Token.SetOrigin(LogonSource.SelectedLogonSession);
 
   if not Status.IsSuccess then
   begin
     OriginSubscription := nil;
-    OriginSubscription := (Token as IToken3).ObserveOrigin(OnOriginChange);
+    OriginSubscription := Token.ObserveOrigin(OnOriginChange);
   end;
 
   Status.RaiseOnError;
 end;
 
-procedure TFrameLogon.BtnSetRefClick(Sender: TObject);
+procedure TFrameLogon.BtnSetRefClick;
 begin
   Assert(Assigned(Token));
-  (Token as IToken3).SetSessionReference(CheckBoxReference.Checked);
+  Token.SetSessionReference(CheckBoxReference.Checked);
 end;
 
-procedure TFrameLogon.CheckBoxReferenceClick(Sender: TObject);
+procedure TFrameLogon.CheckBoxReferenceClick;
 begin
   CheckBoxReference.Font.Style := [fsBold];
 end;
 
-procedure TFrameLogon.ComboOriginChange(Sender: TObject);
+procedure TFrameLogon.ComboOriginChange;
 begin
   ComboOrigin.Color := ColorSettings.clStale;
 end;
 
-constructor TFrameLogon.Create(AOwner: TComponent);
+constructor TFrameLogon.Create;
 begin
   inherited;
   // TODO: TLogonSessionSource triggers enumeration, postpone it until
@@ -99,7 +99,7 @@ begin
   inherited;
 end;
 
-function TFrameLogon.GetSubscribed: Boolean;
+function TFrameLogon.GetSubscribed;
 begin
   Result := Assigned(Token);
 end;
@@ -126,14 +126,14 @@ begin
   with ListView.Items[ListView.Items.Count - 1] do
     if NewOrigin = 0 then
       Cell[1] := '0 (value not set)'
-    else if (Token as IToken3).QueryStatistics(Statistics).IsSuccess and
+    else if Token.QueryStatistics(Statistics).IsSuccess and
       (Statistics.AuthenticationId = NewOrigin) then
       Cell[1] := 'Same as current'
     else
       Cell[1] := IntToHexEx(NewOrigin);
 end;
 
-procedure TFrameLogon.SubscribeToken(const Token: IToken);
+procedure TFrameLogon.SubscribeToken;
 var
   Statistics: TTokenStatistics;
   WellKnownSid: ISid;
@@ -153,7 +153,7 @@ begin
       GroupId := GROUP_IND_LOGON;
     end;
 
-  if (Token as IToken3).QueryStatistics(Statistics).IsSuccess then
+  if Token.QueryStatistics(Statistics).IsSuccess then
   begin
     ListView.Items[0].Cell[1] := IntToHexEx(Statistics.AuthenticationId);
     WellKnownSid := LsaxLookupKnownLogonSessionSid(Statistics.AuthenticationId);
@@ -199,13 +199,13 @@ begin
     GroupId := GROUP_IND_ORIGIN;
   end;
 
-  OriginSubscription := (Token as IToken3).ObserveOrigin(OnOriginChange);
-  FlagsSubscription := (Token as IToken3).ObserveFlags(OnFlagsChange);
+  OriginSubscription := Token.ObserveOrigin(OnOriginChange);
+  FlagsSubscription := Token.ObserveFlags(OnFlagsChange);
 
   ListView.Items.EndUpdate;
 end;
 
-procedure TFrameLogon.UnsubscribeToken(const Dummy: IToken);
+procedure TFrameLogon.UnsubscribeToken;
 begin
   if Assigned(Token) then
     Token := nil;

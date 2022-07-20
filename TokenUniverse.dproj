@@ -138,7 +138,6 @@ $(PostBuildEvent)]]></PostBuildEvent>
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="Core\TU.Tokens.pas"/>
         <DCCReference Include="UI\UI.TokenListFrame.pas">
             <Form>FrameTokenList</Form>
             <DesignClass>TFrame</DesignClass>
@@ -174,7 +173,7 @@ $(PostBuildEvent)]]></PostBuildEvent>
         <DCCReference Include="UI\UI.CreateToken.pas">
             <Form>DialogCreateToken</Form>
         </DCCReference>
-        <DCCReference Include="Core\TU.Tokens.Types.pas"/>
+        <DCCReference Include="Core\TU.Tokens.Old.Types.pas"/>
         <DCCReference Include="UI\UI.Modal.Columns.pas">
             <Form>DialogColumns</Form>
         </DCCReference>
@@ -271,13 +270,20 @@ $(PostBuildEvent)]]></PostBuildEvent>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="Core\TU.Observers.pas"/>
-        <DCCReference Include="Core\TU.Tokens3.Events.pas"/>
-        <DCCReference Include="Core\TU.Tokens3.pas"/>
+        <DCCReference Include="Core\TU.Tokens.Events.pas"/>
+        <DCCReference Include="Core\TU.Tokens.pas"/>
         <DCCReference Include="NtUtilsUI\Common\UI.Exceptions.pas"/>
         <DCCReference Include="Core\TU.Events.pas"/>
         <DCCReference Include="NtUtilsUI\Components\VirtualTreesEx.DefaultMenu.pas"/>
         <DCCReference Include="NtUtilsUI\Components\DevirtualizedTree.Provider.pas"/>
         <DCCReference Include="NtUtilsUI\Components\DevirtualizedTree.pas"/>
+        <DCCReference Include="Core\TU.Tokens.Open.pas"/>
+        <DCCReference Include="UI\UI.New.TokenFrame.pas">
+            <Form>FrameTokens</Form>
+            <FormType>dfm</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="Core\TU.AccountRights.pas"/>
         <None Include="TokenUniverse.todo"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
@@ -1434,7 +1440,7 @@ $(PostBuildEvent)]]></PostBuildEvent>
         <PreBuildEventIgnoreExitCode>False</PreBuildEventIgnoreExitCode>
         <PreLinkEvent/>
         <PreLinkEventIgnoreExitCode>False</PreLinkEventIgnoreExitCode>
-        <PostBuildEvent>map2dbg.exe $(OUTPUTPATH)</PostBuildEvent>
+        <PostBuildEvent>map2dbg.exe $(OUTPUTPATH)</PostBuildEvent>
         <PostBuildEventIgnoreExitCode>True</PostBuildEventIgnoreExitCode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Debug' And '$(Platform)'=='Win64'">
@@ -1442,7 +1448,7 @@ $(PostBuildEvent)]]></PostBuildEvent>
         <PreBuildEventIgnoreExitCode>False</PreBuildEventIgnoreExitCode>
         <PreLinkEvent/>
         <PreLinkEventIgnoreExitCode>False</PreLinkEventIgnoreExitCode>
-        <PostBuildEvent>map2dbg.exe $(OUTPUTPATH)</PostBuildEvent>
+        <PostBuildEvent>map2dbg.exe $(OUTPUTPATH)</PostBuildEvent>
         <PostBuildEventIgnoreExitCode>True</PostBuildEventIgnoreExitCode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Release' And '$(Platform)'=='Win32'">
@@ -1450,7 +1456,7 @@ $(PostBuildEvent)]]></PostBuildEvent>
         <PreBuildEventIgnoreExitCode>False</PreBuildEventIgnoreExitCode>
         <PreLinkEvent/>
         <PreLinkEventIgnoreExitCode>False</PreLinkEventIgnoreExitCode>
-        <PostBuildEvent>map2dbg.exe $(OUTPUTPATH)</PostBuildEvent>
+        <PostBuildEvent>map2dbg.exe $(OUTPUTPATH)</PostBuildEvent>
         <PostBuildEventIgnoreExitCode>True</PostBuildEventIgnoreExitCode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Release' And '$(Platform)'=='Win64'">
@@ -1458,7 +1464,7 @@ $(PostBuildEvent)]]></PostBuildEvent>
         <PreBuildEventIgnoreExitCode>False</PreBuildEventIgnoreExitCode>
         <PreLinkEvent/>
         <PreLinkEventIgnoreExitCode>False</PreLinkEventIgnoreExitCode>
-        <PostBuildEvent>map2dbg.exe $(OUTPUTPATH)</PostBuildEvent>
+        <PostBuildEvent>map2dbg.exe $(OUTPUTPATH)</PostBuildEvent>
         <PostBuildEventIgnoreExitCode>True</PostBuildEventIgnoreExitCode>
     </PropertyGroup>
 </Project>

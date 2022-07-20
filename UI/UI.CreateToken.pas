@@ -5,7 +5,7 @@ interface
 uses
   System.SysUtils, System.Classes, Vcl.Controls, Vcl.Forms, Vcl.Dialogs,
   Vcl.ComCtrls, Vcl.StdCtrls, Vcl.Menus, UI.Prototypes.Forms,
-  UI.Prototypes, VclEx.ListView, UI.MainForm, TU.Tokens, TU.Tokens.Types,
+  UI.Prototypes, VclEx.ListView, UI.MainForm, TU.Tokens, TU.Tokens.Old.Types,
   NtUtils.Security.Sid, UI.Prototypes.Privileges, UI.Prototypes.Groups,
   NtUtils;
 
@@ -75,7 +75,7 @@ type
     procedure ButtonLoadClick(Sender: TObject);
   private
     LogonIDSource: TLogonSessionSource;
-    procedure AddGroup(NewGroup: TGroup);
+    procedure AddGroup(const NewGroup: TGroup);
     procedure UpdatePrimaryAndOwner(Mode: TGroupUpdateType);
     procedure EditSingleGroup(const Value: TGroup);
   public
@@ -88,8 +88,8 @@ uses
   UI.Modal.PickUser, TU.Winapi, VirtualTrees, UI.Settings, UI.Modal.PickToken,
   System.UITypes, NtUtils.Lsa.Sid, Ntapi.WinNt, Ntapi.ntdef, Ntapi.ntexapi,
   Ntapi.ntseapi, Ntapi.ntpebteb, NtUiLib.Errors, DelphiUiLib.Strings,
-  DelphiUiLib.Reflection.Strings, UI.Builtin.DsObjectPicker, TU.Tokens3,
-  Ntapi.ntobapi;
+  DelphiUiLib.Reflection.Strings, UI.Builtin.DsObjectPicker,
+  Ntapi.ntobapi, TU.Tokens.Open;
 
 {$R *.dfm}
 
@@ -123,7 +123,7 @@ end;
 
 procedure TDialogCreateToken.ButtonLoadClick;
 var
-  Source: IToken3;
+  Source: IToken;
   Expiration: TDateTime;
   BasicInfo: TObjectBasicInformation;
   User: TGroup;
@@ -133,7 +133,7 @@ var
   Privileges: TArray<TPrivilege>;
   TokenSource: TTokenSource;
 begin
-  Source := TDialogPickToken.Execute(Self) as IToken3;
+  Source := TDialogPickToken.Execute(Self);
 
   if not Source.QueryBasicInfo(BasicInfo).IsSuccess or
     not BitTest(BasicInfo.GrantedAccess and TOKEN_QUERY) then
@@ -232,17 +232,9 @@ begin
   LsaxLookupNameOrSddl(OwnerGroupName, Owner).RaiseOnError;
   LsaxLookupNameOrSddl(PrimaryGroupName, PrimaryGroup).RaiseOnError;
 
-  Token := TToken.CreateNtCreateToken(
-    User,
-    CheckBoxUserState.Checked,
-    GroupsFrame.All,
-    PrivilegesFrame.Checked,
-    LogonIDSource.SelectedLogonSession,
-    Owner,
-    PrimaryGroup,
-    Source,
-    Expires
-  );
+  MakeNewToken(Token, ttPrimary, User, CheckBoxUserState.Checked,
+    GroupsFrame.All, PrivilegesFrame.Checked, LogonIDSource.SelectedLogonSession,
+    PrimaryGroup, Source, Owner, nil, Expires).RaiseOnError;
 
   FormMain.TokenView.Add(Token);
 
@@ -254,11 +246,11 @@ begin
     NewPolicy := NewPolicy or TOKEN_MANDATORY_POLICY_NEW_PROCESS_MIN;
 
   if NewPolicy <> 0 then
-    (Token as IToken3).SetMandatoryPolicy(NewPolicy).RaiseOnError;
+    Token.SetMandatoryPolicy(NewPolicy).RaiseOnError;
 
   // Post-creation: change session
   if CheckBoxSession.Checked then
-    (Token as IToken3).SetSessionId(RtlGetCurrentPeb.SessionId).RaiseOnError;
+    Token.SetSessionId(RtlGetCurrentPeb.SessionId).RaiseOnError;
 
   if not TSettings.NoCloseCreationDialogs then
     Close;
@@ -376,24 +368,24 @@ begin
   end;
 end;
 
-procedure TDialogCreateToken.MenuEnabledClick(Sender: TObject);
+procedure TDialogCreateToken.MenuEnabledClick;
 begin
  PrivilegesFrame.AdjustSelected(SE_PRIVILEGE_ENABLED_BY_DEFAULT or
    SE_PRIVILEGE_ENABLED);
 end;
 
-procedure TDialogCreateToken.MenuEnabledModifClick(Sender: TObject);
+procedure TDialogCreateToken.MenuEnabledModifClick;
 begin
   PrivilegesFrame.AdjustSelected(SE_PRIVILEGE_ENABLED);
 end;
 
-procedure TDialogCreateToken.MenuRemoveClick(Sender: TObject);
+procedure TDialogCreateToken.MenuRemoveClick;
 begin
   GroupsFrame.VST.DeleteSelectedNodes;
   UpdatePrimaryAndOwner(guRemove);
 end;
 
-procedure TDialogCreateToken.UpdatePrimaryAndOwner(Mode: TGroupUpdateType);
+procedure TDialogCreateToken.UpdatePrimaryAndOwner;
 var
   i: Integer;
   Group: TGroup;

@@ -27,26 +27,28 @@ uses
 
 { TDialogSelectToken }
 
-class function TDialogPickToken.Execute(AOwner: TComponent): IToken;
+class function TDialogPickToken.Execute;
 var
+  Tokens: TArray<IToken>;
   i: Integer;
 begin
   with TDialogPickToken.Create(AOwner) do
   begin
-    for i := 0 to FormMain.TokenView.Count - 1 do
-      ListViewTokens.Items.Add.Caption := FormMain.TokenView.Tokens[i].Caption;
+    Tokens := FormMain.TokenView.Tokens;
+
+    for i := 0 to High(Tokens) do
+      ListViewTokens.Items.Add.Caption := Tokens[i].Caption;
 
     ShowModal;
 
     if not Assigned(ListViewTokens.Selected) then
       Abort;
 
-    Result := FormMain.TokenView.Tokens[ListViewTokens.Selected.Index];
+    Result := Tokens[ListViewTokens.Selected.Index];
   end;
 end;
 
-procedure TDialogPickToken.ListViewTokensSelectItem(Sender: TObject;
-  Item: TListItem; Selected: Boolean);
+procedure TDialogPickToken.ListViewTokensSelectItem;
 begin
   ButtonOK.Enabled := Assigned(ListViewTokens.Selected);
 end;

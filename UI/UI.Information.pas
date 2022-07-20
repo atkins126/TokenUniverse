@@ -5,11 +5,11 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.Menus,
-  Vcl.ComCtrls, Vcl.Buttons, TU.Tokens, System.ImageList, Vcl.ImgList,
+  Vcl.ComCtrls, Vcl.Buttons, System.ImageList, Vcl.ImgList,
   VclEx.ListView, UI.Prototypes, UI.Prototypes.Forms, NtUtils.Security.Sid,
-  TU.Tokens.Types, Ntapi.WinNt, UI.Prototypes.AuditFrame, UI.Prototypes.Logon,
+  TU.Tokens.Old.Types, Ntapi.WinNt, UI.Prototypes.AuditFrame, UI.Prototypes.Logon,
   UI.Prototypes.Privileges, UI.Prototypes.Groups, NtUtils.Lsa.Audit,
-  Ntapi.ntseapi, NtUtils, Vcl.ExtCtrls, UI.Prototypes.Acl, TU.Tokens3;
+  Ntapi.ntseapi, NtUtils, Vcl.ExtCtrls, UI.Prototypes.Acl, TU.Tokens;
 
 type
   TInfoDialog = class(TChildForm)
@@ -136,7 +136,7 @@ type
     procedure UpdateAuditTab;
     procedure UpdateLogonTab;
   public
-    constructor CreateFromToken(AOwner: TComponent; SrcToken: IToken);
+    constructor CreateFromToken(AOwner: TComponent; const SrcToken: IToken);
   end;
 
 implementation
@@ -167,24 +167,24 @@ begin
     Result[i] := Groups[i].Sid;
 end;
 
-procedure TInfoDialog.ActionGroupDisable(Sender: TObject);
+procedure TInfoDialog.ActionGroupDisable;
 begin
   if GroupsMemberFrame.VST.SelectedCount > 0 then
-    (Token as IToken3).AdjustGroups(GroupsToSids(GroupsMemberFrame.Selected),
+    Token.AdjustGroups(GroupsToSids(GroupsMemberFrame.Selected),
       SE_GROUP_DISABLED).RaiseOnError;
 end;
 
-procedure TInfoDialog.ActionGroupEnable(Sender: TObject);
+procedure TInfoDialog.ActionGroupEnable;
 begin
   if GroupsMemberFrame.VST.SelectedCount > 0 then
-    (Token as IToken3).AdjustGroups(GroupsToSids(GroupsMemberFrame.Selected),
+    Token.AdjustGroups(GroupsToSids(GroupsMemberFrame.Selected),
       SE_GROUP_ENABLED).RaiseOnError;
 end;
 
-procedure TInfoDialog.ActionGroupReset(Sender: TObject);
+procedure TInfoDialog.ActionGroupReset;
 begin
   if GroupsMemberFrame.VST.SelectedCount > 0 then
-    (Token as IToken3).AdjustGroupsReset.RaiseOnError;
+    Token.AdjustGroupsReset.RaiseOnError;
 end;
 
 function PrivilegesToWellKnown(
@@ -207,23 +207,23 @@ begin
     Status.RaiseOnError;
 end;
 
-procedure TInfoDialog.ActionPrivilegeDisable(Sender: TObject);
+procedure TInfoDialog.ActionPrivilegeDisable;
 begin
   if PrivilegesFrame.VST.SelectedCount <> 0 then
-    RaiseOnWarningOrError((Token as IToken3).AdjustPrivileges(
+    RaiseOnWarningOrError(Token.AdjustPrivileges(
       PrivilegesToWellKnown(PrivilegesFrame.Selected), SE_PRIVILEGE_DISABLED,
       True));
 end;
 
-procedure TInfoDialog.ActionPrivilegeEnable(Sender: TObject);
+procedure TInfoDialog.ActionPrivilegeEnable;
 begin
   if PrivilegesFrame.VST.SelectedCount <> 0 then
-    RaiseOnWarningOrError((Token as IToken3).AdjustPrivileges(
+    RaiseOnWarningOrError(Token.AdjustPrivileges(
       PrivilegesToWellKnown(PrivilegesFrame.Selected), SE_PRIVILEGE_ENABLED,
       True));
 end;
 
-procedure TInfoDialog.ActionPrivilegeRemove(Sender: TObject);
+procedure TInfoDialog.ActionPrivilegeRemove;
 begin
   if PrivilegesFrame.VST.SelectedCount = 0 then
     Exit;
@@ -232,46 +232,46 @@ begin
     'This action can''t be undone.', mtWarning, mbYesNo, -1) <> idYes then
     Exit;
 
-  RaiseOnWarningOrError((Token as IToken3).AdjustPrivileges(
+  RaiseOnWarningOrError(Token.AdjustPrivileges(
     PrivilegesToWellKnown(PrivilegesFrame.Selected), SE_PRIVILEGE_REMOVED,
     True));
 end;
 
-procedure TInfoDialog.BtnSetIntegrityClick(Sender: TObject);
+procedure TInfoDialog.BtnSetIntegrityClick;
 var
   Status: TNtxStatus;
 begin
-  Status := (Token as IToken3).SetIntegrity(IntegritySource.SelectedIntegrity);
+  Status := Token.SetIntegrity(IntegritySource.SelectedIntegrity);
   ComboIntegrity.Color := clWindow;
 
   if not Status.IsSuccess then
   begin
     IntegritySubscription := nil;
-    IntegritySubscription := (Token as IToken3).ObserveIntegrity(ChangedIntegrity);
+    IntegritySubscription := Token.ObserveIntegrity(ChangedIntegrity);
   end;
 
   Status.RaiseOnError;
 end;
 
-procedure TInfoDialog.BtnSetOwnerClick(Sender: TObject);
+procedure TInfoDialog.BtnSetOwnerClick;
 var
   Sid: ISid;
   Status: TNtxStatus;
 begin
   LsaxLookupNameOrSddl(ComboOwner.Text, Sid).RaiseOnError;
-  Status := (Token as IToken3).SetOwner(Sid);
+  Status := Token.SetOwner(Sid);
   ComboOwner.Color := clWindow;
 
   if not Status.IsSuccess then
   begin
     OwnerSubscription := nil;
-    OwnerSubscription := (Token as IToken3).ObserveOwner(ChangedOwner);
+    OwnerSubscription := Token.ObserveOwner(ChangedOwner);
   end;
 
   Status.RaiseOnError;
 end;
 
-procedure TInfoDialog.BtnSetPolicyClick(Sender: TObject);
+procedure TInfoDialog.BtnSetPolicyClick;
 var
   Policy: TTokenMandatoryPolicy;
   Status: TNtxStatus;
@@ -284,54 +284,54 @@ begin
   if CheckBoxNewProcessMin.Checked then
     Policy := Policy or TOKEN_MANDATORY_POLICY_NEW_PROCESS_MIN;
 
-  Status := (Token as IToken3).SetMandatoryPolicy(Policy);
+  Status := Token.SetMandatoryPolicy(Policy);
   CheckBoxNoWriteUp.Font.Style := [];
   CheckBoxNewProcessMin.Font.Style := [];
 
   if not Status.IsSuccess then
   begin
     PolicySubscription := nil;
-    PolicySubscription := (Token as IToken3).ObserveMandatoryPolicy(ChangedPolicy);
+    PolicySubscription := Token.ObserveMandatoryPolicy(ChangedPolicy);
   end;
 
   Status.RaiseOnError;
 end;
 
-procedure TInfoDialog.BtnSetPrimaryClick(Sender: TObject);
+procedure TInfoDialog.BtnSetPrimaryClick;
 var
   Sid: ISid;
   Status: TNtxStatus;
 begin
   LsaxLookupNameOrSddl(ComboPrimary.Text, Sid).RaiseOnError;
-  Status := (Token as IToken3).SetPrimaryGroup(Sid);
+  Status := Token.SetPrimaryGroup(Sid);
   ComboPrimary.Color := clWindow;
 
   if not Status.IsSuccess then
   begin
     PrimaryGroupSubscription := nil;
-    PrimaryGroupSubscription := (Token as IToken3).ObservePrimaryGroup(
+    PrimaryGroupSubscription := Token.ObservePrimaryGroup(
       ChangedPrimaryGroup);
   end;
 
   Status.RaiseOnError;
 end;
 
-procedure TInfoDialog.BtnSetSessionClick(Sender: TObject);
+procedure TInfoDialog.BtnSetSessionClick;
 var
   Status: TNtxStatus;
 begin
-  Status := (Token as IToken3).SetSessionId(SessionSource.SelectedSession);
+  Status := Token.SetSessionId(SessionSource.SelectedSession);
 
   if not Status.IsSuccess then
   begin
     SessionSubscription := nil;
-    SessionSubscription := (Token as IToken3).ObserveSessionId(ChangedSession);
+    SessionSubscription := Token.ObserveSessionId(ChangedSession);
   end;
 
   Status.RaiseOnError;
 end;
 
-procedure TInfoDialog.BtnSetUIAccessClick(Sender: TObject);
+procedure TInfoDialog.BtnSetUIAccessClick;
 var
   UIAccess: LongBool;
   Status: TNtxStatus;
@@ -341,46 +341,46 @@ begin
   else
     UIAccess := LongBool(ComboUIAccess.ItemIndex);
 
-  Status := (Token as IToken3).SetUIAccess(UIAccess);
+  Status := Token.SetUIAccess(UIAccess);
   ComboUIAccess.Color := clWindow;
 
   if not Status.IsSuccess then
   begin
     UIAccessSubscription := nil;
-    UIAccessSubscription := (Token as IToken3).ObserveUIAccess(ChangedUIAccess);
+    UIAccessSubscription := Token.ObserveUIAccess(ChangedUIAccess);
   end;
 
   Status.RaiseOnError;
 end;
 
-procedure TInfoDialog.BtnSetVAllowedClick(Sender: TObject);
+procedure TInfoDialog.BtnSetVAllowedClick;
 var
   Status: TNtxStatus;
 begin
-  Status := (Token as IToken3).SetVirtualizationAllowed(CheckBoxVAllowed.Checked);
+  Status := Token.SetVirtualizationAllowed(CheckBoxVAllowed.Checked);
   CheckBoxVAllowed.Font.Style := [];
 
   if not Status.IsSuccess then
   begin
     VAllowedSubscription := nil;
-    VAllowedSubscription := (Token as IToken3).ObserveVirtualizationAllowed(
+    VAllowedSubscription := Token.ObserveVirtualizationAllowed(
       ChangedVAllowed);
   end;
 
   Status.RaiseOnError;
 end;
 
-procedure TInfoDialog.BtnSetVEnabledClick(Sender: TObject);
+procedure TInfoDialog.BtnSetVEnabledClick;
 var
   Status: TNtxStatus;
 begin
-  Status := (Token as IToken3).SetVirtualizationEnabled(CheckBoxVEnabled.Checked);
+  Status := Token.SetVirtualizationEnabled(CheckBoxVEnabled.Checked);
   CheckBoxVEnabled.Font.Style := [];
 
   if not Status.IsSuccess then
   begin
     VEnabledSubscription := nil;
-    VEnabledSubscription  := (Token as IToken3).ObserveVirtualizationEnabled(
+    VEnabledSubscription  := Token.ObserveVirtualizationEnabled(
       ChangedVEnabled);
   end;
 end;
@@ -394,13 +394,13 @@ procedure TInfoDialog.ChangedElevation;
 begin
   if Status.IsSuccess then
     ListViewGeneral.Items[4].SubItems[0] :=
-      (Token as IToken3).QueryString(tsElevation);
+      Token.QueryString(tsElevation);
 end;
 
 procedure TInfoDialog.ChangedFlags;
 begin
   if Status.IsSuccess then
-    ListViewAdvanced.Items[10].SubItems[0] := (Token as IToken3).QueryString(tsFlags);
+    ListViewAdvanced.Items[10].SubItems[0] := Token.QueryString(tsFlags);
 end;
 
 procedure TInfoDialog.ChangedGroups;
@@ -425,7 +425,7 @@ begin
   ComboPrimary.Items.Clear;
 
   // Add User since it is always assignable
-  if (Token as IToken3).QueryUser(User).IsSuccess then
+  if Token.QueryUser(User).IsSuccess then
   begin
     UserName := LsaxSidToString(User.Sid);
     ComboOwner.Items.Add(UserName);
@@ -513,14 +513,14 @@ begin
   if Status.IsSuccess then
     with ListViewAdvanced do
     begin
-      Items[2].SubItems[0] := (Token as IToken3).QueryString(tsTokenID);
-      Items[3].SubItems[0] := (Token as IToken3).QueryString(tsLogonID);
-      Items[4].SubItems[0] := (Token as IToken3).QueryString(tsExprires);
-      Items[5].SubItems[0] := (Token as IToken3).QueryString(tsDynamicCharged);
-      Items[6].SubItems[0] := (Token as IToken3).QueryString(tsDynamicAvailable);
-      Items[7].SubItems[0] := (Token as IToken3).QueryString(tsGroups);
-      Items[8].SubItems[0] := (Token as IToken3).QueryString(tsPrivileges);
-      Items[9].SubItems[0] := (Token as IToken3).QueryString(tsModifiedID);
+      Items[2].SubItems[0] := Token.QueryString(tsTokenID);
+      Items[3].SubItems[0] := Token.QueryString(tsLogonID);
+      Items[4].SubItems[0] := Token.QueryString(tsExprires);
+      Items[5].SubItems[0] := Token.QueryString(tsDynamicCharged);
+      Items[6].SubItems[0] := Token.QueryString(tsDynamicAvailable);
+      Items[7].SubItems[0] := Token.QueryString(tsGroups);
+      Items[8].SubItems[0] := Token.QueryString(tsPrivileges);
+      Items[9].SubItems[0] := Token.QueryString(tsModifiedID);
       // TODO: Error hints
     end;
 end;
@@ -556,13 +556,13 @@ begin
   end;
 end;
 
-procedure TInfoDialog.CheckBoxClick(Sender: TObject);
+procedure TInfoDialog.CheckBoxClick;
 begin
   Assert(Sender is TCheckBox);
   (Sender as TCheckBox).Font.Style := [fsBold];
 end;
 
-constructor TInfoDialog.CreateFromToken(AOwner: TComponent; SrcToken: IToken);
+constructor TInfoDialog.CreateFromToken;
 begin
   Assert(Assigned(SrcToken));
   Token := SrcToken;
@@ -573,34 +573,34 @@ begin
   Show;
 end;
 
-procedure TInfoDialog.DoCloseForm(Sender: TObject);
+procedure TInfoDialog.DoCloseForm;
 begin
   Close;
 end;
 
-procedure TInfoDialog.EditAppContainerDblClick(Sender: TObject);
+procedure TInfoDialog.EditAppContainerDblClick;
 var
   Info: TAppContainerInfo;
 begin
-  if (Token as IToken3).QueryAppContainerInfo(Info).IsSuccess then
+  if Token.QueryAppContainerInfo(Info).IsSuccess then
     TDialogAppContainer.Execute(FormMain, Info.User, Info.Package);
 end;
 
-procedure TInfoDialog.EditUserDblClick(Sender: TObject);
+procedure TInfoDialog.EditUserDblClick;
 var
   User: TGroup;
 begin
-  if (Token as IToken3).QueryUser(User).IsSuccess then
+  if Token.QueryUser(User).IsSuccess then
     TDialogSidView.CreateView(FormMain, User.Sid);
 end;
 
-procedure TInfoDialog.FormClose(Sender: TObject; var Action: TCloseAction);
+procedure TInfoDialog.FormClose;
 begin
   IntegritySource.Free;
   SessionSource.Free;
 end;
 
-procedure TInfoDialog.FormCreate(Sender: TObject);
+procedure TInfoDialog.FormCreate;
 begin
   SessionSource := TSessionSource.Create(ComboSession, False);
   IntegritySource := TIntegritySource.Create(ComboIntegrity);
@@ -610,27 +610,26 @@ begin
   // handler, and distributes changed one to every existing event listener
   Refresh;
 
-  IntegritySubscription := (Token as IToken3).ObserveIntegrity(ChangedIntegrity);
-  SessionSubscription := (Token as IToken3).ObserveSessionId(ChangedSession);
-  UIAccessSubscription := (Token as IToken3).ObserveUIAccess(ChangedUIAccess);
-  PolicySubscription := (Token as IToken3).ObserveMandatoryPolicy(ChangedPolicy);
-  PrivilegesSubscription := (Token as IToken3).ObservePrivileges(ChangedPrivileges);
-  GroupsSubscription := (Token as IToken3).ObserveGroups(ChangedGroups);
-  StatisticsSubscription := (Token as IToken3).ObserveStatistics(ChangedStatistics);
-  OwnerSubscription := (Token as IToken3).ObserveOwner(ChangedOwner);
-  PrimaryGroupSubscription := (Token as IToken3).ObservePrimaryGroup(ChangedPrimaryGroup);
-  VAllowedSubscription := (Token as IToken3).ObserveVirtualizationAllowed(ChangedVAllowed);
-  VEnabledSubscription := (Token as IToken3).ObserveVirtualizationEnabled(ChangedVEnabled);
-  ElevationSubscription := (Token as IToken3).ObserveElevation(ChangedElevation);
-  FlagsSubscription := (Token as IToken3).ObserveFlags(ChangedFlags);
-  CaptionSubscription := (Token as IToken3).ObserveString(tsCaption, ChangedCaption);
+  IntegritySubscription := Token.ObserveIntegrity(ChangedIntegrity);
+  SessionSubscription := Token.ObserveSessionId(ChangedSession);
+  UIAccessSubscription := Token.ObserveUIAccess(ChangedUIAccess);
+  PolicySubscription := Token.ObserveMandatoryPolicy(ChangedPolicy);
+  PrivilegesSubscription := Token.ObservePrivileges(ChangedPrivileges);
+  GroupsSubscription := Token.ObserveGroups(ChangedGroups);
+  StatisticsSubscription := Token.ObserveStatistics(ChangedStatistics);
+  OwnerSubscription := Token.ObserveOwner(ChangedOwner);
+  PrimaryGroupSubscription := Token.ObservePrimaryGroup(ChangedPrimaryGroup);
+  VAllowedSubscription := Token.ObserveVirtualizationAllowed(ChangedVAllowed);
+  VEnabledSubscription := Token.ObserveVirtualizationEnabled(ChangedVEnabled);
+  ElevationSubscription := Token.ObserveElevation(ChangedElevation);
+  FlagsSubscription := Token.ObserveFlags(ChangedFlags);
+  CaptionSubscription := Token.ObserveString(tsCaption, ChangedCaption);
 
   TabRestricted.Caption := Format('Restricting SIDs (%d)',
     [GroupsRestrictedFrame.VST.RootNodeCount]);
 end;
 
-procedure TInfoDialog.FormKeyDown(Sender: TObject; var Key: Word;
-  Shift: TShiftState);
+procedure TInfoDialog.FormKeyDown;
 begin
   if Key = VK_F5 then
     Refresh;
@@ -641,23 +640,23 @@ begin
   TDialogSidView.CreateView(Self, Group.Sid);
 end;
 
-procedure TInfoDialog.ListViewAdvancedResize(Sender: TObject);
+procedure TInfoDialog.ListViewAdvancedResize;
 begin
   // HACK: designs-time AutoSize causes horizontal scrollbar to appear
   ListViewAdvanced.Columns[1].AutoSize := True;
 end;
 
-procedure TInfoDialog.ListViewGeneralDblClick(Sender: TObject);
+procedure TInfoDialog.ListViewGeneralDblClick;
 var
   BasicInfo: TObjectBasicInformation;
 begin
   if Assigned(ListViewGeneral.Selected) and
     (ListViewGeneral.Selected.Index = 2) and
-    (Token as IToken3).QueryBasicInfo(BasicInfo).IsSuccess then
+    Token.QueryBasicInfo(BasicInfo).IsSuccess then
     TDialogGrantedAccess.Execute(Owner, BasicInfo.GrantedAccess);
 end;
 
-procedure TInfoDialog.PageControlChange(Sender: TObject);
+procedure TInfoDialog.PageControlChange;
 begin
   if PageControl.ActivePageIndex = TabObject.TabIndex then
     UpdateObjectTab
@@ -675,31 +674,31 @@ var
   Package: ISid;
   RestrictedSids: TArray<TGroup>;
 begin
-  (Token as IToken3).SmartRefresh;
+  Token.SmartRefresh;
 
   ListViewGeneral.Items.BeginUpdate;
   with ListViewGeneral do
   begin
-    Items[0].SubItems[0] := (Token as IToken3).QueryString(tsAddress);
+    Items[0].SubItems[0] := Token.QueryString(tsAddress);
     ListViewObject.Items[0].SubItems[0] := Items[0].SubItems[0];
-    Items[1].SubItems[0] := (Token as IToken3).QueryString(tsHandle);
-    Items[2].SubItems[0] := (Token as IToken3).QueryString(tsAccess, True);
-    Items[3].SubItems[0] := (Token as IToken3).QueryString(tsType);
+    Items[1].SubItems[0] := Token.QueryString(tsHandle);
+    Items[2].SubItems[0] := Token.QueryString(tsAccess, True);
+    Items[3].SubItems[0] := Token.QueryString(tsType);
   end;
   ListViewGeneral.Items.EndUpdate;
 
   ListViewAdvanced.Items.BeginUpdate;
   with ListViewAdvanced do
   begin
-    Items[0].SubItems[0] := (Token as IToken3).QueryString(tsSourceName);
-    Items[1].SubItems[0] := (Token as IToken3).QueryString(tsSourceId);
+    Items[0].SubItems[0] := Token.QueryString(tsSourceName);
+    Items[1].SubItems[0] := Token.QueryString(tsSourceId);
   end;
   ListViewAdvanced.Items.EndUpdate;
 
-  if (Token as IToken3).QueryDefaultDacl(DefaultDacl).IsSuccess then
+  if Token.QueryDefaultDacl(DefaultDacl).IsSuccess then
     FrameDefaultDacl.Load(Auto.RefOrNil<PAcl>(DefaultDacl), nil);
 
-  if (Token as IToken3).QueryUser(User).IsSuccess then
+  if Token.QueryUser(User).IsSuccess then
   begin
     // For user, 0 means default (enabled) state, but it can also
     // be use-for-deny-only.
@@ -719,7 +718,7 @@ begin
     // AppContainer is user-specific
     if not RtlOsVersionAtLeast(OsWin8) then
       EditAppContainer.Text := 'Not supported'
-    else if (Token as IToken3).QueryAppContainerSid(Package).IsSuccess then
+    else if Token.QueryAppContainerSid(Package).IsSuccess then
     begin
       if not Assigned(Package) then
         EditAppContainer.Text := 'No'
@@ -731,7 +730,7 @@ begin
     end;
   end;
 
-  if (Token as IToken3).QueryRestrictedSids(RestrictedSids).IsSuccess then
+  if Token.QueryRestrictedSids(RestrictedSids).IsSuccess then
     GroupsRestrictedFrame.Load(RestrictedSids);
 
   TabObject.Tag := TAB_INVALIDATED;
@@ -742,14 +741,14 @@ end;
 procedure TInfoDialog.SetAuditPolicy;
 begin
   try
-    (Token as IToken3).SetAuditPolicy(LsaxUserAuditToTokenAudit(Audit)).RaiseOnError;
+    Token.SetAuditPolicy(LsaxUserAuditToTokenAudit(Audit)).RaiseOnError;
   finally
     TabAudit.Tag := TAB_INVALIDATED;
     UpdateAuditTab;
   end;
 end;
 
-procedure TInfoDialog.SetStaleColor(Sender: TObject);
+procedure TInfoDialog.SetStaleColor;
 begin
   Assert(Sender is TComboBox);
   (Sender as TComboBox).Color := ColorSettings.clStale;
@@ -764,7 +763,7 @@ begin
     Exit;
 
   // TODO: Subscribe event
-  if (Token as IToken3).QueryAuditPolicy(AuditPolicy).IsSuccess and
+  if Token.QueryAuditPolicy(AuditPolicy).IsSuccess and
     LsaxTokenAuditToUserAudit(AuditPolicy.Data, AuditOverrides).IsSuccess then
     FrameAudit.Load(AuditOverrides)
   else
@@ -778,8 +777,8 @@ begin
   if TabLogon.Tag = TAB_UPDATED then
     Exit;
 
-  (Token as IToken3).RefreshStatistics;
-  (Token as IToken3).RefreshOrigin;
+  Token.RefreshStatistics;
+  Token.RefreshOrigin;
 
   if not FrameLogon.Subscribed then
     FrameLogon.SubscribeToken(Token);
@@ -797,7 +796,7 @@ begin
     Exit;
 
   // Update basic object information
-  if (Token as IToken3).QueryBasicInfo(BasicInfo).IsSuccess then
+  if Token.QueryBasicInfo(BasicInfo).IsSuccess then
     with ListViewObject do
     begin
       Items[1].SubItems[0] := TNumeric.Represent(BasicInfo.Attributes).Text;
@@ -812,7 +811,7 @@ begin
   ListViewProcesses.SmallImages := TProcessIcons.ImageList;
 
   // Snapshot handles that point to that object
-  if (Token as IToken3).QueryHandles(Handles).IsSuccess then
+  if Token.QueryHandles(Handles).IsSuccess then
   begin
     for i := 0 to High(Handles) do
       with ListViewProcesses.Items.Add do
@@ -834,7 +833,7 @@ begin
       end;
   end;
 
-  ListViewObject.Items[6].SubItems[0] := (Token as IToken3).QueryString(tsCreator);
+  ListViewObject.Items[6].SubItems[0] := Token.QueryString(tsCreator);
   ListViewProcesses.Items.EndUpdate;
   TabObject.Tag := TAB_UPDATED;
 end;

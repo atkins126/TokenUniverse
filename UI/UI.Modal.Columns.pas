@@ -26,11 +26,11 @@ var
 implementation
 
 uses
-  TU.Tokens, UI.Settings, TU.Tokens3;
+  UI.Settings, TU.Tokens;
 
 {$R *.dfm}
 
-procedure TDialogColumns.ButtonOKClick(Sender: TObject);
+procedure TDialogColumns.ButtonOKClick;
 var
   i: Integer;
 begin
@@ -40,7 +40,7 @@ begin
       Include(TSettings.SelectedColumns, TTokenStringClass(i));
 end;
 
-procedure TDialogColumns.FormCreate(Sender: TObject);
+procedure TDialogColumns.FormCreate;
 var
   tsc: TTokenStringClass;
 begin
