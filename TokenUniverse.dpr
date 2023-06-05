@@ -2,6 +2,7 @@ program TokenUniverse;
 
 uses
   Vcl.Forms,
+  Ntapi.ntpebteb,
   NtUtils,
   NtUtils.Svc.SingleTaskSvc,
   NtUiLib.Errors,
@@ -15,7 +16,6 @@ uses
   TU.Suggestions in 'Core\TU.Suggestions.pas',
   UI.Restrict in 'UI\UI.Restrict.pas' {DialogRestrictToken},
   UI.Prototypes in 'UI\UI.Prototypes.pas',
-  TU.Credentials in 'Core\TU.Credentials.pas',
   UI.Modal.Logon in 'UI\UI.Modal.Logon.pas' {LogonDialog},
   UI.Modal.PickUser in 'UI\UI.Modal.PickUser.pas' {DialogPickUser},
   UI.CreateToken in 'UI\UI.CreateToken.pas' {DialogCreateToken},
@@ -42,7 +42,7 @@ uses
   UI.ProcessIcons in 'NtUtilsUI\Common\UI.ProcessIcons.pas',
   UI.Prototypes.AccessMask in 'NtUtilsUI\Prototypes\UI.Prototypes.AccessMask.pas' {AccessMaskFrame: TFrame},
   UI.AppContainer.View in 'UI\UI.AppContainer.View.pas' {DialogAppContainer},
-  TU.Exec in 'Core\TU.Exec.pas',
+  TU.Processes.Create in 'Core\TU.Processes.Create.pas',
   UI.AppContainer.List in 'UI\UI.AppContainer.List.pas' {DialogACProfiles},
   UI.Prototypes.BitMask in 'NtUtilsUI\Prototypes\UI.Prototypes.BitMask.pas' {BitMaskFrame: TFrame},
   UI.Prototypes.Groups in 'NtUtilsUI\Prototypes\UI.Prototypes.Groups.pas' {FrameGroups: TFrame},
@@ -64,7 +64,11 @@ uses
   DevirtualizedTree in 'NtUtilsUI\Components\DevirtualizedTree.pas',
   TU.Tokens.Open in 'Core\TU.Tokens.Open.pas',
   UI.New.TokenFrame in 'UI\UI.New.TokenFrame.pas' {FrameTokens: TFrame},
-  TU.AccountRights in 'Core\TU.AccountRights.pas';
+  TU.AccountRights in 'Core\TU.AccountRights.pas',
+  UI.Access in 'UI\UI.Access.pas' {AccessCheckForm},
+  TU.Access in 'Core\TU.Access.pas',
+  TU.DesktopAccess in 'Core\TU.DesktopAccess.pas',
+  TU.Startup in 'Core\TU.Startup.pas';
 
 {$R *.res}
 
@@ -83,9 +87,11 @@ begin
     Exit;
   end;
 
+  if RtlGetCurrentPeb.ImageBaseAddress <> @ImageBase then
+    IsLibrary := True;
+
   // Normal mode
   EnableNtUiLibExceptionHandling;
-  EnableStackTracingExceptions(True);
   ReportMemoryLeaksOnShutdown := True;
   Application.Initialize;
   Application.MainFormOnTaskbar := True;

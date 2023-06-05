@@ -64,6 +64,10 @@ type
     N6: TMenuItem;
     cmRevokeCurrent: TMenuItem;
     cmRevokeToken: TMenuItem;
+    cmAllocConsole: TMenuItem;
+    N7: TMenuItem;
+    cmAccess: TMenuItem;
+    MenuSecurePrompt: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure ActionDuplicate(Sender: TObject);
     procedure ActionClose(Sender: TObject);
@@ -105,6 +109,9 @@ type
     procedure TokenViewVSTGetPopupMenu(Sender: TBaseVirtualTree;
       Node: PVirtualNode; Column: TColumnIndex; const P: TPoint;
       var AskParent: Boolean; var PopupMenu: TPopupMenu);
+    procedure cmAllocConsoleClick(Sender: TObject);
+    procedure cmAccessClick(Sender: TObject);
+    procedure MenuSecurePromptClick(Sender: TObject);
   end;
 
 var
@@ -119,9 +126,9 @@ uses
   UI.Restrict, UI.CreateToken, UI.Modal.Columns, UI.Modal.Access,
   UI.Modal.Logon, UI.Modal.AccessAndType, UI.Modal.PickUser, UI.Settings,
   UI.New.Safer, Ntapi.ntpsapi, UI.Audit.System, UI.Process.Run, Ntapi.ntstatus,
-  DelphiUtils.Arrays, NtUiLib.Errors, Ntapi.ntseapi, NtUtils,
+  DelphiUtils.Arrays, NtUiLib.Errors, Ntapi.ntseapi, NtUtils, UI.Access,
   NtUiLib.Exceptions.Dialog, UI.Prototypes.Forms, TU.Tokens.Open,
-  NtUtils.Tokens.Impersonate, NtUtils.Processes, NtUtils.Objects;
+  NtUtils.Tokens.Impersonate, NtUtils.Processes, NtUtils.Objects, TU.Startup;
 
 {$R *.dfm}
 
@@ -314,6 +321,30 @@ begin
   TokenView.Add(Token);
 end;
 
+procedure TFormMain.cmAccessClick(Sender: TObject);
+begin
+  TAccessCheckForm.CreateChild(Self, cfmDesktop).Show;
+end;
+
+procedure TFormMain.cmAllocConsoleClick(Sender: TObject);
+var
+  Result: TNtxStatus;
+begin
+  if not cmAllocConsole.Checked then
+  begin
+    Result.Location := 'AllocConsole';
+    Result.Win32Result := AllocConsole;
+  end
+  else
+  begin
+    Result.Location := 'FreeConsole';
+    Result.Win32Result := FreeConsole;
+  end;
+
+  Result.RaiseOnError;
+  cmAllocConsole.Checked := not cmAllocConsole.Checked;
+end;
+
 procedure TFormMain.CurrentUserChanged;
 begin
   if Active or (Sender <> TimerStateCheck) then
@@ -324,11 +355,15 @@ procedure TFormMain.FormClose;
 begin
   TFormEvents.OnMainFormClose.Invoke;
   TokenView.Free;
+
+  if cmAllocConsole.Checked then
+    FreeConsole;
 end;
 
 procedure TFormMain.FormCreate;
 var
   Token: IToken;
+  TokenType: TObjectTypeInfo;
   Elevation: TTokenElevationInfo;
   Handles: TArray<TProcessHandleEntry>;
   Linked: IToken;
@@ -338,14 +373,16 @@ begin
   CurrentUserChanged(Self);
 
   // Search for inherited handles
-  if NtxEnumerateHandlesProcess(NtCurrentProcess, Handles).IsSuccess then
+  if RtlxFindKernelType('Token', TokenType).IsSuccess and
+    NtxEnumerateHandlesProcess(NtCurrentProcess, Handles).IsSuccess then
   begin
-    // TODO: obtain token's type index in runtime
-    TArray.FilterInline<TProcessHandleEntry>(Handles, ByType(5));
+    TArray.FilterInline<TProcessHandleEntry>(Handles,
+      ByType(TokenType.Other.TypeIndex));
 
     for i := 0 to High(Handles) do
-      TokenView.Add(CaptureTokenHandle(Auto.CaptureHandle(Handle),
-        Format('Inherited %d [0x%x]', [Handle, Handle])));
+      TokenView.Add(CaptureTokenHandle(Auto.CaptureHandle(
+        Handles[i].HandleValue), Format('Inherited %d [0x%x]',
+        [Handles[i].HandleValue, Handles[i].HandleValue])));
   end;
 
   MakeOpenProcessToken(Token, nil, NtCurrentProcessId).RaiseOnError;
@@ -357,7 +394,8 @@ begin
     Token.QueryLinkedToken(Linked).IsSuccess then
       TokenView.Add(Linked, nil, False);
 
-  LoadLibrary('xmllite.dll');
+  // Load useful delay dependencies while we can
+  TuPreloadDelayModules;
 
   SetForegroundWindow(TokenView.VST.Handle);
 end;
@@ -437,6 +475,12 @@ procedure TFormMain.MenuSafeImpersonationClick;
 begin
   TSettings.UseSafeImpersonation := not TSettings.UseSafeImpersonation;
   MenuSafeImpersonation.Checked := TSettings.UseSafeImpersonation;
+end;
+
+procedure TFormMain.MenuSecurePromptClick(Sender: TObject);
+begin
+  TSettings.PromtOnSecureDesktop := not TSettings.PromtOnSecureDesktop ;
+  MenuSecurePrompt.Checked := TSettings.PromtOnSecureDesktop;
 end;
 
 procedure TFormMain.MenuSystemAuditClick;

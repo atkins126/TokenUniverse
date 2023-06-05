@@ -5,9 +5,9 @@ interface
 uses
   System.SysUtils, System.Classes, Vcl.Graphics, Vcl.Controls, Vcl.Forms,
   Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, UI.Prototypes.Forms,
-  Vcl.ExtCtrls, Vcl.Menus, TU.Tokens, NtUtils.Environment,
-  NtUtils.Objects, Ntapi.WinUser, NtUtils, Ntapi.ProcessThreadsApi,
-  NtUtils.Processes.Create, Ntapi.ntpsapi;
+  Vcl.ExtCtrls, Vcl.Menus, TU.Tokens, NtUtils.Environment, NtUtils,
+  Ntapi.ProcessThreadsApi, NtUtils.Processes.Create, Ntapi.ntpsapi,
+  TU.Processes.Create, Ntapi.WinNt;
 
 type
   TDialogRun = class(TChildForm)
@@ -39,7 +39,7 @@ type
     EditParent: TEdit;
     PopupClearParent: TPopupMenu;
     MenuClearParent: TMenuItem;
-    CheckBoxNewConsole: TCheckBox;
+    CheckBoxInheritConsole: TCheckBox;
     CheckBoxRunAsInvoker: TCheckBox;
     EditAppContainer: TEdit;
     LabelAppContainer: TLabel;
@@ -71,6 +71,10 @@ type
     ComboBoxManifestDpi: TComboBox;
     CheckBoxManifestGdiScaling: TCheckBox;
     CheckBoxManifestLongPaths: TCheckBox;
+    LabelProtection: TLabel;
+    ComboBoxProtection: TComboBox;
+    EditAppId: TEdit;
+    LabelAppId: TLabel;
     procedure MenuSelfClick(Sender: TObject);
     procedure MenuCmdClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
@@ -90,9 +94,10 @@ type
     procedure EditManifestFileEnter(Sender: TObject);
     procedure CheckBoxManifestThemesEnter(Sender: TObject);
   private
-    ExecMethod: TCreateProcessMethod;
+    Method: TKnownCreateMethod;
     FToken: IToken;
     ParentAccessMask: TProcessAccessMask;
+    ParentProcessId: TProcessId;
     hxParentProcess: IHandle;
     AppContainerSid: ISid;
     CaptionSubscription: IAutoReleasable;
@@ -101,6 +106,7 @@ type
     procedure SetToken(const Value: IToken);
     procedure UpdateDesktopList;
     function TryOpenToken(const Info: TProcessInfo): TNtxStatus;
+    function GetProtection(out Value: TProtectionLevel): Boolean;
   public
     property UseToken: IToken read FToken write SetToken;
     constructor Create(AOwner: TComponent); override;
@@ -109,16 +115,13 @@ type
 implementation
 
 uses
-  Ntapi.WinNt, Ntapi.Shlwapi, NtUtils.WinUser, Ntapi.ntseapi, Ntapi.ntstatus,
-  Ntapi.ntcsrapi, NtUtils.Processes, NtUiLib.Errors, NtUtils.Sections,
-  NtUtils.Tokens.Info, NtUtils.Processes.Create.Win32, NtUtils.Profiles,
-  NtUtils.Processes.Create.Shell, NtUtils.Processes.Create.Native,
-  NtUtils.Processes.Create.Com, NtUtils.Processes.Create.Remote,
-  NtUtils.Processes.Create.Manual, NtUtils.Tokens, NtUtils.Csr,
-  NtUiLib.TaskDialog, NtUtils.SysUtils, NtUtils.Threads, NtUtils.Manifests,
-  NtUtils.Processes.Info, NtUtils.Files.Open, TU.Exec, UI.Information,
-  UI.ProcessList, UI.AppContainer.List, UI.MainForm, TU.Credentials,
-  TU.Tokens.Open;
+  Ntapi.ntstatus, Ntapi.WinError, Ntapi.ntseapi, Ntapi.WinUser,
+  Ntapi.wincred, Ntapi.Shlwapi,
+  NtUtils.Processes, NtUtils.Processes.Create.Remote, NtUtils.Objects,
+  NtUtils.WinUser, NtUtils.Tokens, NtUtils.Tokens.Info, NtUtils.Profiles,
+  NtUiLib.Errors, NtUiLib.TaskDialog, NtUiLib.WinCred,
+  UI.Information, UI.ProcessList, UI.AppContainer.List, UI.MainForm,
+  TU.Tokens.Open, UI.Settings, System.UITypes, NtUtils.Security.Sid;
 
 {$R *.dfm}
 
@@ -135,7 +138,7 @@ begin
   NtxQuerySidToken(hxToken, TokenUser, User).RaiseOnError;
 
   AppContainerSid := TDialogACProfiles.ExecuteSelect(FormMain, User);
-  EditAppContainer.Text := UnvxAppContainerToString(AppContainerSid, User);
+  EditAppContainer.Text := RtlxSidToString(AppContainerSid);
 end;
 
 procedure TDialogRun.ButtonBrowseClick;
@@ -155,6 +158,7 @@ begin
   NtxOpenProcess(hxParentProcess, ClientIdEx.ProcessID,
     ParentAccessMask).RaiseOnError;
 
+  ParentProcessId := ClientIdEx.ProcessID;
   EditParent.Text := Format('%s [%d]', [ClientIdEx.ImageName,
     ClientIdEx.ProcessID]);
 end;
@@ -167,17 +171,24 @@ end;
 procedure TDialogRun.ButtonRunClick;
 var
   Options: TCreateProcessOptions;
+  OptionsEx: TTuCreateProcessOptions;
   ProcInfo: TProcessInfo;
-  AutoCancel: IAutoReleasable;
-  ManifestBuilfer: IManifestBuilder;
-  ManifestRva: TMemory;
-  hxManifestSection: IHandle;
+  Credentials: TLogonCredentials;
+  PromptFlags: TCredUiWinFlags;
+  Status: TNtxStatus;
 begin
-  if (@ExecMethod = @AdvxCreateProcessRemote) and
-    not Assigned(hxParentProcess) then
+  if (Method = cmCreateProcessViaInjection) and not Assigned(hxParentProcess) then
   begin
     UsrxShowTaskDialog(Handle, 'Error', 'Invalid Parent Process',
       'The selected method requires explicitly specifying a parent process.',
+      diError, dbOk);
+    Exit;
+  end;
+
+  if (Method = cmIDesktopAppxActivator) and (EditAppId.Text = '') then
+  begin
+    UsrxShowTaskDialog(Handle, 'Error', 'Invalid AppUserModeId',
+      'The selected method requires explicitly specifying package information.',
       diError, dbOk);
     Exit;
   end;
@@ -187,10 +198,12 @@ begin
   Options.Parameters := EditParams.Text;
   Options.CurrentDirectory := EditDir.Text;
   Options.Desktop := ComboBoxDesktop.Text;
+  Options.ParentProcessId := ParentProcessId;
   Options.hxParentProcess := hxParentProcess;
   Options.AppContainer := AppContainerSid;
   Options.LogonFlags := TProcessLogonFlags(ComboBoxLogonFlags.ItemIndex);
   Options.WindowMode := TShowMode32(ComboBoxShowMode.ItemIndex);
+  Options.AppUserModeId := EditAppId.Text;
 
   if Assigned(FToken) then
     Options.hxToken := FToken.Handle;
@@ -207,8 +220,8 @@ begin
   if CheckBoxInherit.Checked then
     Include(Options.Flags, poInheritHandles);
 
-  if CheckBoxNewConsole.Checked then
-    Include(Options.Flags, poNewConsole);
+  if CheckBoxInheritConsole.Checked then
+    Include(Options.Flags, poInheritConsole);
 
   if CheckBoxIgnoreElevation.Checked then
     Include(Options.Flags, poIgnoreElevation);
@@ -242,122 +255,59 @@ begin
     Options.ChildPolicy := Options.ChildPolicy or
       PROCESS_CREATION_CHILD_PROCESS_OVERRIDE;
 
-  if (spoDetectManifest in ExecSupports(ExecMethod)) and
-    not RadioButtonManifestNone.Checked then
-  begin
-    Include(Options.Flags, poDetectManifest);
+  if GetProtection(Options.Protection) then
+    Include(Options.Flags, poUseProtection);
 
-    // Also suspend while we register with SxS
-    Include(Options.Flags, poSuspended);
+  OptionsEx := Default(TTuCreateProcessOptions);
+
+  if RadioButtonManifestNone.Checked then
+    OptionsEx.ManifestMode := mmNoRegistration
+  else if RadioButtonManifestEmbedded.Checked then
+    OptionsEx.ManifestMode := mmUseEmbedded
+  else if RadioButtonManifestExternalExe.Checked then
+  begin
+    OptionsEx.ManifestMode := mmUseFromPE;
+    OptionsEx.ManifestFilename := EditManifestExecutable.Text;
+  end
+  else if RadioButtonManifestExternal.Checked then
+  begin
+    OptionsEx.ManifestMode := mmUseFromXML;
+    OptionsEx.ManifestFilename := EditManifestFile.Text;
+  end
+  else if RadioButtonManifestCustom.Checked then
+  begin
+    OptionsEx.ManifestMode := mmCustom;
+    OptionsEx.UseRuntimeThemes := CheckBoxManifestThemes.Checked;
+    OptionsEx.UseGdiScaling := CheckBoxManifestGdiScaling.Checked;
+    OptionsEx.UseLongPathAware := CheckBoxManifestLongPaths.Checked;
+    Integer(OptionsEx.DpiAwareness) := ComboBoxManifestDpi.ItemIndex;
   end;
 
-  // Prompt for credentials if necessary
-  if @ExecMethod = @AdvxCreateProcessWithLogon then
-    PromptCredentialsUI(Handle,
-      procedure (Domain, User, Password: String)
-      begin
-        Options.Domain := Domain;
-        Options.Username := User;
-        Options.Password := Password;
-      end
-    );
+  // Prompt for credentials when using logon
+  if Method = cmCreateProcessWithLogon then
+  begin
+    if TSettings.PromtOnSecureDesktop then
+      PromptFlags := CREDUIWIN_SECURE_PROMPT
+    else
+      PromptFlags := 0;
+
+    Status := CredxPromptForWindowsCredentials(Handle, 'Token Universe',
+      'Credentials for the new process:', Credentials,
+      PromptFlags);
+
+    if Status.Win32Error = ERROR_CANCELLED then
+      Abort;
+
+    Status.RaiseOnError;
+
+    Options.Domain := Credentials.Domain;
+    Options.Username := Credentials.Username;
+    Options.Password := Credentials.Password;
+  end;
+
+  TuCreateProcess(Handle, Options, OptionsEx, Method, ProcInfo).RaiseOnError;
 
   // TODO: check that the process didn't crash immediately
-
-  if Assigned(ExecMethod) then
-    ExecMethod(Options, ProcInfo).RaiseOnError
-  else
-    raise Exception.Create('No exec method selected');
-
-  // Manually register with SxS if necessary
-  if (spoDetectManifest in ExecSupports(ExecMethod)) and
-    not RadioButtonManifestNone.Checked then
-  begin
-    // Terminate on failure
-    AutoCancel := NtxDelayedTerminateProcess(ProcInfo.hxProcess,
-      STATUS_CANCELLED);
-
-    // Embedded
-    if RadioButtonManifestEmbedded.Checked and
-      (@ExecMethod <> @AdvxCreateProcess) then
-      CsrxRegisterProcessCreation(Options, ProcInfo).RaiseOnError
-
-    // External PE file
-    else if RadioButtonManifestExternalExe.Checked then
-    begin
-      RtlxCreateFileSection(
-        hxManifestSection,
-        FileOpenParameters.UseFileName(EditManifestExecutable.Text, fnWin32),
-        RtlxSecImageNoExecute
-      ).RaiseOnError;
-
-      RtlxFindManifestInSection(
-        hxManifestSection.Handle,
-        ManifestRva
-      ).RaiseOnError;
-
-      CsrxRegisterProcessManifest(
-        ProcInfo.hxProcess.Handle,
-        ProcInfo.hxThread.Handle,
-        ProcInfo.ClientId,
-        hxManifestSection.Handle,
-        BASE_MSG_HANDLETYPE_SECTION,
-        ManifestRva,
-        Options.ApplicationWin32
-      ).RaiseOnError
-    end
-
-    // External XML file
-    else if RadioButtonManifestExternal.Checked then
-      CsrxRegisterProcessManifestFromFile(
-        ProcInfo.hxProcess.Handle,
-        ProcInfo.hxThread.Handle,
-        ProcInfo.ClientId,
-        EditManifestFile.Text,
-        Options.ApplicationWin32
-      ).RaiseOnError
-
-    // Custom
-    else if RadioButtonManifestCustom.Checked then
-    begin
-      ManifestBuilfer := NewManifestBuilder
-        .UseRuntimeThemes(CheckBoxManifestThemes.Checked)
-        .UseGdiScaling(CheckBoxManifestGdiScaling.Checked)
-        .UseLongPathAware(CheckBoxManifestLongPaths.Checked);
-
-      case ComboBoxManifestDpi.ItemIndex of
-        1: ManifestBuilfer := ManifestBuilfer
-            .UseDpiAware(dpiAwareFalse)
-            .UseDpiAwareness(dpiUnaware);
-
-        2: ManifestBuilfer := ManifestBuilfer
-            .UseDpiAware(dpiAwareTrue)
-            .UseDpiAwareness(dpiSystem);
-
-        3: ManifestBuilfer := ManifestBuilfer
-            .UseDpiAware(dpiAwareTruePerMonitor)
-            .UseDpiAwareness(dpiPerMonitor);
-
-        4: ManifestBuilfer := ManifestBuilfer
-            .UseDpiAware(dpiAwareTruePerMonitor)
-            .UseDpiAwareness(dpiPerMonitorV2);
-      end;
-
-      CsrxRegisterProcessManifestFromString(
-        ProcInfo.hxProcess.Handle,
-        ProcInfo.hxThread.Handle,
-        ProcInfo.ClientId,
-        ManifestBuilfer.Build,
-        Options.ApplicationWin32
-      ).RaiseOnError
-    end;
-
-    // Prevent termination on failure
-    AutoCancel.AutoRelease := False;
-
-    if not CheckBoxSuspended.Checked then
-      NtxResumeThread(ProcInfo.hxThread.Handle);
-  end;
 
   // Check if we need to open the token since we might have a process handle
   if cbxOpenToken.Checked then
@@ -368,29 +318,14 @@ procedure TDialogRun.ChangedExecMethod;
 var
   OldParentAccessMask: TProcessAccessMask;
 begin
-  case ComboMethod.ItemIndex of
-    0: ExecMethod := AdvxCreateProcess;
-    1: ExecMethod := AdvxCreateProcessWithToken;
-    2: ExecMethod := AdvxCreateProcessWithLogon;
-    3: ExecMethod := AdvxCreateProcessRemote;
-    4: ExecMethod := RtlxCreateUserProcess;
-    5: ExecMethod := RtlxCreateUserProcessEx;
-    6: ExecMethod := NtxCreateUserProcess;
-    7: ExecMethod := NtxCreateProcessEx;
-    8: ExecMethod := ShlxExecute;
-    9: ExecMethod := ComxShellExecute;
-    10: ExecMethod := WdcxCreateProcess;
-    11: ExecMethod := WmixCreateProcess;
-  else
-    ExecMethod := nil;
-  end;
+  Method := TKnownCreateMethod(ComboMethod.ItemIndex + 1);
 
-  if spoParentProcess in ExecSupports(ExecMethod) then
+  if spoParentProcess in TuPsMethodSupports(Method) then
   begin
     OldParentAccessMask := ParentAccessMask;
 
     // Determine required access to the parent process
-    if @ExecMethod = @AdvxCreateProcessRemote then
+    if Method = cmCreateProcessViaInjection then
       ParentAccessMask := PROCESS_CREATE_PROCESS_REMOTE
     else
       ParentAccessMask := PROCESS_CREATE_PROCESS;
@@ -445,12 +380,31 @@ end;
 procedure TDialogRun.FormKeyDown;
 begin
   // Ctrl+N to switch between tabs
-  if (Shift = [ssCtrl]) and (Key >= Ord('1')) and (Key <= Ord('4')) then
+  if (Shift = [ssCtrl]) and (Key >= Ord('1')) and (Key <= Ord('3')) then
     PageControl.ActivePageIndex := Key - Ord('1');
 
   // Ctrl+O to choose a file
   if (Shift = [ssCtrl]) and (Key = Ord('O')) then
     ButtonBrowse.Click;
+end;
+
+function TDialogRun.GetProtection;
+begin
+  Result := True;
+
+  case ComboBoxProtection.ItemIndex of
+    1: Value := PROTECTION_LEVEL_CODEGEN_LIGHT;
+    2: Value := PROTECTION_LEVEL_ANTIMALWARE_LIGHT;
+    3: Value := PROTECTION_LEVEL_PPL_APP;
+    4: Value := PROTECTION_LEVEL_LSA_LIGHT;
+    5: Value := PROTECTION_LEVEL_WINDOWS_LIGHT;
+    6: Value := PROTECTION_LEVEL_WINTCB_LIGHT;
+    7: Value := PROTECTION_LEVEL_AUTHENTICODE;
+    8: Value := PROTECTION_LEVEL_WINDOWS;
+    9: Value := PROTECTION_LEVEL_WINTCB;
+  else
+    Result := False;
+  end;
 end;
 
 procedure TDialogRun.LinkLabelTokenLinkClick;
@@ -467,6 +421,7 @@ end;
 
 procedure TDialogRun.MenuClearParentClick;
 begin
+  ParentProcessId := 0;
   hxParentProcess := nil;
   EditParent.Text := '<not specified>';
 end;
@@ -528,7 +483,7 @@ var
   Found: Boolean;
   i: Integer;
 begin
-  Desktops := UsrxEnumAllDesktops;
+  Desktops := UsrxEnumerateAllDesktops;
   Current := UsrxCurrentDesktopName.ToLower;
 
   with ComboBoxDesktop do
@@ -561,29 +516,31 @@ end;
 
 procedure TDialogRun.UpdateEnabledState;
 var
-  SupportedOptions: TExecParamSet;
+  SupportedOptions: TSupportedCreateParameters;
 begin
-  SupportedOptions := ExecSupports(ExecMethod);
+  SupportedOptions := TuPsMethodSupports(Method);
 
+  EditDir.Enabled := spoCurrentDirectory in SupportedOptions;
   ComboBoxDesktop.Enabled := spoDesktop in SupportedOptions;
-  ComboBoxLogonFlags.Enabled := spoCredentials in SupportedOptions;
+  ComboBoxLogonFlags.Enabled := spoLogonFlags in SupportedOptions;
   CheckBoxInherit.Enabled := spoInheritHandles in SupportedOptions;
   CheckBoxSuspended.Enabled := spoSuspended in SupportedOptions;
   CheckBoxBreakaway.Enabled := spoBreakawayFromJob in SupportedOptions;
   CheckBoxForceBreakaway.Enabled := spoForceBreakaway in SupportedOptions;
-  CheckBoxNewConsole.Enabled := spoNewConsole in SupportedOptions;
+  CheckBoxInheritConsole.Enabled := spoInheritConsole in SupportedOptions;
   CheckBoxRunas.Enabled := spoRequireElevation in SupportedOptions;
   CheckBoxIgnoreElevation.Enabled := spoIgnoreElevation in SupportedOptions;
   ComboBoxShowMode.Enabled := spoWindowMode in SupportedOptions;
   CheckBoxRunAsInvoker.Enabled := spoRunAsInvoker in SupportedOptions;
-  EditParent.Enabled := spoParentProcess in SupportedOptions;
-  ButtonChooseParent.Enabled := spoParentProcess in SupportedOptions;
+  EditParent.Enabled := [spoParentProcess, spoParentProcessId] * SupportedOptions <> [];
+  ButtonChooseParent.Enabled := [spoParentProcess, spoParentProcessId] * SupportedOptions <> [];
   EditAppContainer.Enabled := spoAppContainer in SupportedOptions;
   ButtonAC.Enabled := spoAppContainer in SupportedOptions;
   CheckBoxLPAC.Enabled := spoLPAC in SupportedOptions;
   CheckBoxChildRestricted.Enabled := spoChildPolicy in SupportedOptions;
   CheckBoxChildUnlessSecure.Enabled := spoChildPolicy in SupportedOptions;
   CheckBoxChildOverride.Enabled := spoChildPolicy in SupportedOptions;
+  ComboBoxProtection.Enabled := spoProtection in SupportedOptions;
   RadioButtonManifestNone.Enabled := spoDetectManifest in SupportedOptions;
   RadioButtonManifestEmbedded.Enabled := spoDetectManifest in SupportedOptions;
   RadioButtonManifestExternalExe.Enabled := spoDetectManifest in SupportedOptions;
@@ -596,6 +553,12 @@ begin
   CheckBoxManifestLongPaths.Enabled := spoDetectManifest in SupportedOptions;
   LabelManifestDpi.Enabled := spoDetectManifest in SupportedOptions;
   ComboBoxManifestDpi.Enabled := spoDetectManifest in SupportedOptions;
+  EditAppId.Enabled := spoAppUserModeId in SupportedOptions;
+
+  if spoToken in SupportedOptions then
+    LinkLabelToken.Font.Style := LinkLabelToken.Font.Style - [fsStrikeOut]
+  else
+    LinkLabelToken.Font.Style := LinkLabelToken.Font.Style + [fsStrikeOut];
 end;
 
 end.

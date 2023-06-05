@@ -60,7 +60,7 @@
     <PropertyGroup Condition="'$(Base)'!=''">
         <DCC_TypedAtParameter>true</DCC_TypedAtParameter>
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
-        <VerInfo_Keys>CompanyName=diversenok;FileDescription=An advanced tool for working with access tokens;FileVersion=0.2.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=0.2.0.0;Comments=https://github.com/diversenok/TokenUniverse</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=diversenok;FileDescription=An advanced tool for working with access tokens;FileVersion=0.3.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=0.3.0.0;Comments=https://github.com/diversenok/TokenUniverse</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <Icon_MainIcon>$(BDS)\bin\delphi_PROJECTICON.ico</Icon_MainIcon>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
@@ -163,7 +163,6 @@ $(PostBuildEvent)]]></PostBuildEvent>
             <Form>DialogRestrictToken</Form>
         </DCCReference>
         <DCCReference Include="UI\UI.Prototypes.pas"/>
-        <DCCReference Include="Core\TU.Credentials.pas"/>
         <DCCReference Include="UI\UI.Modal.Logon.pas">
             <Form>LogonDialog</Form>
         </DCCReference>
@@ -230,7 +229,7 @@ $(PostBuildEvent)]]></PostBuildEvent>
         <DCCReference Include="UI\UI.AppContainer.View.pas">
             <Form>DialogAppContainer</Form>
         </DCCReference>
-        <DCCReference Include="Core\TU.Exec.pas"/>
+        <DCCReference Include="Core\TU.Processes.Create.pas"/>
         <DCCReference Include="UI\UI.AppContainer.List.pas">
             <Form>DialogACProfiles</Form>
         </DCCReference>
@@ -284,6 +283,13 @@ $(PostBuildEvent)]]></PostBuildEvent>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="Core\TU.AccountRights.pas"/>
+        <DCCReference Include="UI\UI.Access.pas">
+            <Form>AccessCheckForm</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
+        <DCCReference Include="Core\TU.Access.pas"/>
+        <DCCReference Include="Core\TU.DesktopAccess.pas"/>
+        <DCCReference Include="Core\TU.Startup.pas"/>
         <None Include="TokenUniverse.todo"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

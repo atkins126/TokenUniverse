@@ -9,7 +9,8 @@ interface
 uses
   Ntapi.WinNt, Ntapi.ntseapi, Ntapi.ntobapi, Ntapi.winsta, Ntapi.appmodel,
   NtUtils, NtUtils.Tokens.Info, NtUtils.Objects.Snapshots, NtUtils.Profiles,
-  NtUtils.Lsa.Logon, DelphiUtils.AutoObjects, DelphiUtils.AutoEvents;
+  NtUtils.Security.AppContainer, NtUtils.Lsa.Logon, DelphiUtils.AutoObjects,
+  DelphiUtils.AutoEvents;
 
 type
   ITokenAuditPolicy = IMemory<PTokenAuditPolicy>;
@@ -1165,8 +1166,8 @@ function TToken.ObserveVirtualizationEnabled;
 var
   Info: LongBool;
 begin
-  Callback(QueryVirtualizationAllowed(Info), Info);
-  Result := Events.OnVirtualizationAllowed.Subscribe(Callback);
+  Callback(QueryVirtualizationEnabled(Info), Info);
+  Result := Events.OnVirtualizationEnabled.Subscribe(Callback);
 end;
 
 function TToken.QueryAppContainerInfo;
@@ -1189,11 +1190,11 @@ begin
 
   // Read profile info from the registry
   if Result.IsSuccess then
-    Result := UnvxQueryAppContainer(AppContainer, Package, User.Sid);
+    Result := RtlxQueryAppContainer(AppContainer, Package, User.Sid);
 
   if Result.IsSuccess then
   begin
-    Events.StringCache[tsAppContainerName] := AppContainer.Name;
+    Events.StringCache[tsAppContainerName] := AppContainer.FullMoniker;
     Events.StringCache[tsAppContainerDisplayName] := AppContainer.DisplayName;
   end;
 
@@ -2361,7 +2362,7 @@ function TToken.RefreshVirtualizationEnabled;
 var
   Info: LongBool;
 begin
-  Result := QueryVirtualizationAllowed(Info);
+  Result := QueryVirtualizationEnabled(Info);
 end;
 
 function TToken.SetAuditPolicy;

@@ -59,6 +59,13 @@ object FormMain: TFormMain
       object N1: TMenuItem
         Caption = '-'
       end
+      object cmAllocConsole: TMenuItem
+        Caption = 'Allocate Console'
+        OnClick = cmAllocConsoleClick
+      end
+      object N7: TMenuItem
+        Caption = '-'
+      end
       object MenuExit: TMenuItem
         Caption = 'Exit'
         OnClick = MenuExitClick
@@ -142,6 +149,11 @@ object FormMain: TFormMain
         Caption = 'Manage System Audit...'
         OnClick = MenuSystemAuditClick
       end
+      object cmAccess: TMenuItem
+        Caption = 'Check access to...'
+        ShortCut = 119
+        OnClick = cmAccessClick
+      end
       object MenuRunProgram: TMenuItem
         Caption = 'Run program...'
         ShortCut = 120
@@ -167,6 +179,11 @@ object FormMain: TFormMain
         Caption = 'Use safe impersonation technique'
         Checked = True
         OnClick = MenuSafeImpersonationClick
+      end
+      object MenuSecurePrompt: TMenuItem
+        Caption = 'Show logon prompt on secure desktop'
+        Checked = True
+        OnClick = MenuSecurePromptClick
       end
       object Showiconsinprocesslist1: TMenuItem
         Caption = 'Show icons in process list'

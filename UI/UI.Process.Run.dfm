@@ -92,55 +92,53 @@ object DialogRun: TDialogRun
         object CheckBoxInherit: TCheckBox
           Left = 11
           Top = 24
-          Width = 115
+          Width = 134
           Height = 17
           Hint = 'Allow the new process inherit handles from the parent process'
           Caption = 'Inherit handles'
           TabOrder = 0
         end
         object CheckBoxSuspended: TCheckBox
-          Left = 11
-          Top = 47
-          Width = 115
+          Left = 157
+          Top = 24
+          Width = 134
           Height = 17
           Hint = 'Do not let the process start immediately'
           Caption = 'Create suspended'
-          TabOrder = 2
+          TabOrder = 4
         end
         object CheckBoxBreakaway: TCheckBox
-          Left = 158
-          Top = 24
+          Left = 11
+          Top = 68
           Width = 134
           Height = 17
           Hint = 'Start the new process outside the parent'#39's job object if allowed'
           Caption = 'Breakaway from job'
-          TabOrder = 1
+          TabOrder = 2
         end
-        object CheckBoxNewConsole: TCheckBox
+        object CheckBoxInheritConsole: TCheckBox
           Left = 11
-          Top = 90
+          Top = 46
           Width = 134
           Height = 17
           Hint = 'Create a new console instead of inheriting one from the parent'
-          Caption = 'Create new console'
-          Checked = True
-          State = cbChecked
-          TabOrder = 6
+          Caption = 'Inherit console'
+          TabOrder = 1
         end
         object CheckBoxRunas: TCheckBox
-          Left = 11
-          Top = 70
-          Width = 116
+          Left = 157
+          Top = 46
+          Width = 134
           Height = 15
           Hint = 'Ask User Account Control for elevation'
           Caption = 'Request elevation'
           Enabled = False
-          TabOrder = 4
+          TabOrder = 5
         end
         object CheckBoxRunAsInvoker: TCheckBox
-          Left = 158
-          Top = 68
-          Width = 116
+          Left = 157
+          Top = 90
+          Width = 134
           Height = 17
           Hint = 
             'Configure __COMPAT_LAYER environment variable to enable/disable ' +
@@ -148,12 +146,12 @@ object DialogRun: TDialogRun
           AllowGrayed = True
           Caption = 'Run as invoker'
           State = cbGrayed
-          TabOrder = 5
+          TabOrder = 7
         end
         object CheckBoxForceBreakaway: TCheckBox
-          Left = 158
-          Top = 47
-          Width = 116
+          Left = 11
+          Top = 90
+          Width = 134
           Height = 15
           Hint = 
             'Allows the new process to breakaway from all parent jobs regardl' +
@@ -164,13 +162,13 @@ object DialogRun: TDialogRun
         end
         object CheckBoxIgnoreElevation: TCheckBox
           Left = 158
-          Top = 91
-          Width = 116
+          Top = 68
+          Width = 133
           Height = 15
           Hint = 'Force starting the process without elevation'
           Caption = 'Ignore elevation'
           Enabled = False
-          TabOrder = 7
+          TabOrder = 6
         end
       end
       object ComboBoxLogonFlags: TComboBox
@@ -244,6 +242,8 @@ object DialogRun: TDialogRun
           'NtCreateProcessEx'
           'ShellExecuteEx'
           'ShellExecute via IShellDispatch'
+          'IDesktopAppXActivator'
+          'IBackgroundCopyJob2::SetNotifyCmdLine'
           'WdcRunTaskAsInteractiveUser'
           'WMI')
       end
@@ -286,14 +286,28 @@ object DialogRun: TDialogRun
       ImageIndex = 1
       object LabelAppContainer: TLabel
         Left = 3
-        Top = 16
+        Top = 59
         Width = 70
         Height = 13
         Caption = 'AppContainer:'
       end
+      object LabelProtection: TLabel
+        Left = 3
+        Top = 252
+        Width = 53
+        Height = 13
+        Caption = 'Protection:'
+      end
+      object LabelAppId: TLabel
+        Left = 3
+        Top = 7
+        Width = 81
+        Height = 13
+        Caption = 'AppUserModeId:'
+      end
       object ButtonAC: TButton
-        Left = 226
-        Top = 11
+        Left = 227
+        Top = 76
         Width = 83
         Height = 25
         Anchors = [akTop, akRight]
@@ -304,9 +318,9 @@ object DialogRun: TDialogRun
         OnClick = ButtonACClick
       end
       object EditAppContainer: TEdit
-        Left = 79
-        Top = 13
-        Width = 141
+        Left = 3
+        Top = 78
+        Width = 217
         Height = 21
         Anchors = [akLeft, akTop, akRight]
         ReadOnly = True
@@ -314,8 +328,8 @@ object DialogRun: TDialogRun
         Text = 'No'
       end
       object CheckBoxLPAC: TCheckBox
-        Left = 79
-        Top = 40
+        Left = 3
+        Top = 104
         Width = 230
         Height = 17
         Anchors = [akLeft, akTop, akRight]
@@ -325,7 +339,7 @@ object DialogRun: TDialogRun
       end
       object GroupBoxChildFlags: TGroupBox
         Left = 3
-        Top = 72
+        Top = 138
         Width = 306
         Height = 105
         Anchors = [akLeft, akTop, akRight]
@@ -358,6 +372,38 @@ object DialogRun: TDialogRun
           Caption = 'Override'
           TabOrder = 2
         end
+      end
+      object ComboBoxProtection: TComboBox
+        Left = 62
+        Top = 249
+        Width = 247
+        Height = 21
+        Style = csDropDownList
+        Anchors = [akLeft, akTop, akRight]
+        ItemIndex = 0
+        TabOrder = 4
+        Text = 'Not specified'
+        Items.Strings = (
+          'Not specified'
+          'Light (CodeGen)'
+          'Light (Antimalware)'
+          'Light (StoreApp)'
+          'Light (LSA)'
+          'Light (Windows)'
+          'Light (WinTcb)'
+          'Full (Authenticode)'
+          'Full (Windows)'
+          'Full (WinTcb)')
+      end
+      object EditAppId: TEdit
+        Left = 3
+        Top = 26
+        Width = 306
+        Height = 21
+        Hint = '{PackageFamilyName}!{AppId}'
+        Anchors = [akLeft, akTop, akRight]
+        TabOrder = 5
+        TextHint = '{PackageFamilyName}!{AppId}'
       end
     end
     object Manifest: TTabSheet

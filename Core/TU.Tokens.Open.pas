@@ -3,8 +3,12 @@ unit TU.Tokens.Open;
 interface
 
 uses
-  Ntapi.WinNt, Ntapi.ntdef, Ntapi.ntseapi, Ntapi.NtSecApi, NtUtils,
-  TU.Tokens, TU.Tokens.Old.Types, DelphiApi.Reflection;
+  Ntapi.WinNt, Ntapi.ntdef, Ntapi.ntseapi, Ntapi.NtSecApi, Ntapi.WinBase,
+  NtUtils, NtUtils.Tokens.Logon, TU.Tokens, TU.Tokens.Old.Types,
+  DelphiApi.Reflection;
+
+type
+  TLogonCredentials = NtUtils.Tokens.Logon.TLogonCredentials;
 
 // Create an anonymous token
 function MakeAnonymousToken(
@@ -71,7 +75,7 @@ function MakeOpenEffectiveToken(
 // Copy an effective token using direct impersonation
 function MakeCopyViaDirectImpersonation(
   out Token: IToken;
-  [opt, Access(THREAD_QUERY_LIMITED_INFORMATION)] hxThread: IHandle;
+  [opt, Access(THREAD_DIRECT_IMPERSONATION)] hxThread: IHandle;
   [opt] TID: TThreadId;
   ImpersonationLevel: TSecurityImpersonationLevel = SecurityImpersonation;
   DesiredAccess: TTokenAccessMask = MAXIMUM_ALLOWED;
@@ -81,20 +85,12 @@ function MakeCopyViaDirectImpersonation(
 // Logon a user using credentials
 function MakeLogonToken(
   out Token: IToken;
+  MessageType: TLogonSubmitType;
   LogonType: TSecurityLogonType;
-  const Domain: String;
-  const User: String;
-  const Password: String;
-  [opt] const AdditionalGroups: TArray<TGroup> = nil
-): TNtxStatus;
-
-// Logon a user via S4U
-function MakeS4ULogonToken(
-  out Token: IToken;
-  const Domain : String;
-  const User: String;
+  const Credentials: TLogonCredentials;
   const Source: TTokenSource;
-  const AdditionalGroups: TArray<TGroup> = nil
+  [opt] const AdditionalGroups: TArray<TGroup> = nil;
+  const Package: AnsiString = NEGOSSP_NAME_A
 ): TNtxStatus;
 
 // Create a new token from scratch
@@ -118,8 +114,8 @@ implementation
 uses
   Ntapi.ntpsapi, Ntapi.ntstatus, NtUtils.Tokens.Impersonate, NtUtils.Tokens,
   NtUtils.WinStation, NtUtils.Processes, NtUtils.Processes.Info,
-  NtUtils.Threads, NtUtils.Objects, NtUtils.Tokens.Logon, NtUtils.Lsa.Sid,
-  DelphiUiLib.Reflection, System.SysUtils;
+  NtUtils.Threads, NtUtils.Objects, NtUtils.Lsa.Sid, DelphiUiLib.Reflection,
+  System.SysUtils;
 
 function MakeAnonymousToken;
 var
@@ -330,23 +326,14 @@ end;
 
 function MakeLogonToken;
 var
-  hxToken: IHandle;
+  Info: TLogonInfo;
 begin
-  Result := LsaxLogonUser(hxToken, Domain, User, PWideChar(Password), LogonType,
-    AdditionalGroups);
+  Result := LsaxLogonUser(Info, MessageType, LogonType, Credentials, Source,
+    AdditionalGroups, Package);
 
   if Result.IsSuccess then
-    Token := CaptureTokenHandle(hxToken, 'Logon Of ' + User);
-end;
-
-function MakeS4ULogonToken;
-var
-  hxToken: IHandle;
-begin
-  Result := LsaxLogonS4U(hxToken, Domain, User, Source, AdditionalGroups);
-
-  if Result.IsSuccess then
-    Token := CaptureTokenHandle(hxToken, 'S4U Logon Of ' + User);
+    Token := CaptureTokenHandle(Info.hxToken, 'Logon of ' +
+      Credentials.Username);
 end;
 
 function MakeNewToken;
