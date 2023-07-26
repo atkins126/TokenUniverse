@@ -83,7 +83,7 @@ uses
   NtUtils.Processes.Create.Win32, NtUtils.Processes.Create.Shell,
   NtUtils.Processes.Create.Native, NtUtils.Processes.Create.Com,
   NtUtils.Processes.Create.Remote, NtUtils.Processes.Create.Manual,
-  TU.DesktopAccess;
+  NtUtils.Processes.Create.Package, TU.DesktopAccess;
 
 function TuGetPsMethod;
 begin
@@ -120,11 +120,12 @@ const PS_SUPPORTS: array [TKnownCreateMethod] of TSupportedCreateParameters = (
 
   // CreateProcessWithToken
   [spoCurrentDirectory, spoSuspended, spoEnvironment, spoWindowMode,
-    spoWindowTitle, spoDesktop, spoToken, spoLogonFlags],
+    spoWindowTitle, spoDesktop, spoToken, spoParentProcess, spoLogonFlags],
 
   // CreateProcessWithLogon
   [spoCurrentDirectory, spoSuspended, spoEnvironment, spoWindowMode,
-    spoWindowTitle, spoDesktop, spoLogonFlags, spoCredentials],
+    spoWindowTitle, spoDesktop, spoParentProcess, spoLogonFlags,
+    spoCredentials],
 
   // CreateProcess via code injection
   [spoCurrentDirectory, spoSuspended, spoInheritHandles, spoBreakawayFromJob,
@@ -162,8 +163,9 @@ const PS_SUPPORTS: array [TKnownCreateMethod] of TSupportedCreateParameters = (
   // IShellDispatch
   [spoCurrentDirectory, spoRequireElevation, spoWindowMode],
 
-  // IDesktopAppXActivator (excluding OS version-dependent parameters)
-  [spoRequireElevation, spoToken, spoAppUserModeId, spoPackageBreakaway],
+  // IDesktopAppXActivator
+  [spoCurrentDirectory, spoSuspended, spoRequireElevation, spoWindowMode,
+    spoToken, spoParentProcess, spoPackageBreakaway, spoAppUserModeId],
 
   // BITS
   [],
@@ -176,24 +178,11 @@ const PS_SUPPORTS: array [TKnownCreateMethod] of TSupportedCreateParameters = (
 );
 
 function TuPsMethodSupports;
-var
-  OsVersion: TWindowsVersion;
 begin
   if (KnownMethod <= cmInvalid) or (KnownMethod > High(TKnownCreateMethod)) then
     Exit([]);
 
   Result := PS_SUPPORTS[KnownMethod];
-
-  if KnownMethod = cmIDesktopAppxActivator then
-  begin
-    OsVersion := RtlOsVersion;
-
-    if OsVersion >= OsWin11 then
-      Result := Result + [spoCurrentDirectory, spoWindowMode];
-
-    if OsVersion >= OsWin10RS2 then
-      Result := Result + [spoParentProcessId];
-  end;
 end;
 
 function RequiresSxSRegistration(

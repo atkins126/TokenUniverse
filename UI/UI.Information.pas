@@ -145,12 +145,12 @@ implementation
 
 uses
   System.UITypes, UI.MainForm, UI.Colors, UI.ProcessList, Ntapi.ntstatus,
-  UI.Information.Access, UI.Sid.View, NtUtils.Objects.Snapshots,
+  UI.Sid.View, NtUtils.Objects.Snapshots,
   NtUiLib.Errors, DelphiUiLib.Strings, NtUtils.Security.AppContainer,
-  DelphiUiLib.Reflection.Strings,
+  DelphiUiLib.Reflection.Strings, NtUiCommon.Prototypes,
   Ntapi.ntpsapi, NtUtils.Processes, DelphiUiLib.Reflection, NtUtils.Profiles,
   NtUtils.Lsa.Sid, DelphiUtils.Arrays, UI.ProcessIcons, Ntapi.Versions,
-  UI.AppContainer.View, NtUiLib.Exceptions, Ntapi.ntobapi;
+  NtUiBackend.AppContainers, NtUiLib.Exceptions, Ntapi.ntobapi;
 
 const
   TAB_INVALIDATED = 0;
@@ -582,11 +582,10 @@ end;
 procedure TInfoDialog.EditAppContainerDblClick;
 var
   Info: TAppContainerInfo;
-  User: TGroup;
 begin
-  if Token.QueryAppContainerInfo(Info).IsSuccess and
-    Token.QueryUser(User).IsSuccess then
-    TDialogAppContainer.Execute(FormMain, User.Sid, Info.Sid);
+  if Assigned(NtUiLibShowAppContainer) and
+    Token.QueryAppContainerInfo(Info).IsSuccess then
+    NtUiLibShowAppContainer(Info);
 end;
 
 procedure TInfoDialog.EditUserDblClick;
@@ -653,10 +652,11 @@ procedure TInfoDialog.ListViewGeneralDblClick;
 var
   BasicInfo: TObjectBasicInformation;
 begin
-  if Assigned(ListViewGeneral.Selected) and
+  if Assigned(NtUiLibShowAccessMask) and Assigned(ListViewGeneral.Selected) and
     (ListViewGeneral.Selected.Index = 2) and
     Token.QueryBasicInfo(BasicInfo).IsSuccess then
-    TDialogGrantedAccess.Execute(Owner, BasicInfo.GrantedAccess);
+    NtUiLibShowAccessMask(BasicInfo.GrantedAccess, TypeInfo(TTokenAccessMask),
+      TokenGenericMapping);
 end;
 
 procedure TInfoDialog.PageControlChange;
@@ -676,6 +676,7 @@ var
   User: TGroup;
   Package: ISid;
   RestrictedSids: TArray<TGroup>;
+  AppContainerInfo: TAppContainerInfo;
 begin
   Token.SmartRefresh;
 
@@ -721,15 +722,17 @@ begin
     // AppContainer is user-specific
     if not RtlOsVersionAtLeast(OsWin8) then
       EditAppContainer.Text := 'Not supported'
+    else if Token.QueryAppContainerInfo(AppContainerInfo).IsSuccess then
+    begin
+      EditAppContainer.Text := AppContainerInfo.FriendlyName;
+      EditAppContainer.Hint := AppContainerInfo.Hint;
+    end
     else if Token.QueryAppContainerSid(Package).IsSuccess then
     begin
       if not Assigned(Package) then
-        EditAppContainer.Text := 'No'
+        EditAppContainer.Text := 'N/A'
       else
-      begin
         EditAppContainer.Text := RtlxSidToString(Package);
-        EditAppContainer.Enabled := True;
-      end;
     end;
   end;
 

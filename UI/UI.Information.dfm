@@ -338,7 +338,6 @@ object InfoDialog: TInfoDialog
         Anchors = [akLeft, akTop, akRight]
         AutoSelect = False
         AutoSize = False
-        Enabled = False
         ReadOnly = True
         TabOrder = 27
         Text = 'Unknown AppContainer'

@@ -68,6 +68,9 @@ type
     N7: TMenuItem;
     cmAccess: TMenuItem;
     MenuSecurePrompt: TMenuItem;
+    cmClipboardToken: TMenuItem;
+    cmPipeLoopbackToken: TMenuItem;
+    cmImpersonate: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure ActionDuplicate(Sender: TObject);
     procedure ActionClose(Sender: TObject);
@@ -112,6 +115,9 @@ type
     procedure cmAllocConsoleClick(Sender: TObject);
     procedure cmAccessClick(Sender: TObject);
     procedure MenuSecurePromptClick(Sender: TObject);
+    procedure cmClipboardTokenClick(Sender: TObject);
+    procedure cmPipeLoopbackTokenClick(Sender: TObject);
+    procedure cmImpersonateClick(Sender: TObject);
   end;
 
 var
@@ -345,6 +351,40 @@ begin
   cmAllocConsole.Checked := not cmAllocConsole.Checked;
 end;
 
+procedure TFormMain.cmClipboardTokenClick;
+var
+  Token: IToken;
+begin
+  MakeClipboardToken(Token).RaiseOnError;
+  TokenView.Add(Token);
+end;
+
+procedure TFormMain.cmImpersonateClick;
+var
+  Token: IToken;
+begin
+  Token := TokenView.Selected;
+
+  if AskConvertToImpersonation(Handle, Token) then
+    TokenView.Add(Token);
+
+  if TSettings.UseSafeImpersonation then
+    Token.AssignToThreadSafeById(NtCurrentThreadId).RaiseOnError
+  else
+    Token.AssignToThreadById(NtCurrentThreadId).RaiseOnError;
+
+  CurrentUserChanged(Self);
+  ShowSuccessMessage(Handle, 'The token was successfully assigned to the current thread.');
+end;
+
+procedure TFormMain.cmPipeLoopbackTokenClick(Sender: TObject);
+var
+  Token: IToken;
+begin
+  MakePipeLoopbackToken(Token).RaiseOnError;
+  TokenView.Add(Token);
+end;
+
 procedure TFormMain.CurrentUserChanged;
 begin
   if Active or (Sender <> TimerStateCheck) then
@@ -369,7 +409,7 @@ var
   Linked: IToken;
   i: integer;
 begin
-  TokenView.VST.OnInspectNode := ActionOpen;
+  TokenView.VST.OnMainAction := ActionOpen;
   CurrentUserChanged(Self);
 
   // Search for inherited handles

@@ -26,7 +26,6 @@ uses
   UI.Modal.ComboDlg in 'UI\UI.Modal.ComboDlg.pas' {ComboDialog},
   TU.Winapi in 'Core\TU.Winapi.pas',
   UI.Modal.ThreadList in 'UI\UI.Modal.ThreadList.pas' {ThreadListDialog},
-  UI.Information.Access in 'UI\UI.Information.Access.pas' {DialogGrantedAccess},
   UI.Modal.PickToken in 'UI\UI.Modal.PickToken.pas' {DialogPickToken},
   UI.New.Safer in 'UI\UI.New.Safer.pas' {DialogSafer},
   UI.Prototypes.AuditFrame in 'UI\UI.Prototypes.AuditFrame.pas' {FrameAudit: TFrame},
@@ -40,11 +39,7 @@ uses
   VclEx.Form in 'NtUtilsUI\VclEx\VclEx.Form.pas',
   UI.Colors in 'NtUtilsUI\Common\UI.Colors.pas',
   UI.ProcessIcons in 'NtUtilsUI\Common\UI.ProcessIcons.pas',
-  UI.Prototypes.AccessMask in 'NtUtilsUI\Prototypes\UI.Prototypes.AccessMask.pas' {AccessMaskFrame: TFrame},
-  UI.AppContainer.View in 'UI\UI.AppContainer.View.pas' {DialogAppContainer},
   TU.Processes.Create in 'Core\TU.Processes.Create.pas',
-  UI.AppContainer.List in 'UI\UI.AppContainer.List.pas' {DialogACProfiles},
-  UI.Prototypes.BitMask in 'NtUtilsUI\Prototypes\UI.Prototypes.BitMask.pas' {BitMaskFrame: TFrame},
   UI.Prototypes.Groups in 'NtUtilsUI\Prototypes\UI.Prototypes.Groups.pas' {FrameGroups: TFrame},
   UI.Helper in 'NtUtilsUI\Common\UI.Helper.pas',
   UI.Modal.Integrity in 'UI\UI.Modal.Integrity.pas' {IntegrityPicker},
@@ -68,7 +63,20 @@ uses
   UI.Access in 'UI\UI.Access.pas' {AccessCheckForm},
   TU.Access in 'Core\TU.Access.pas',
   TU.DesktopAccess in 'Core\TU.DesktopAccess.pas',
-  TU.Startup in 'Core\TU.Startup.pas';
+  TU.Startup in 'Core\TU.Startup.pas',
+  NtUiBackend.AppContainers in 'NtUtilsUI\Common\NtUiBackend.AppContainers.pas',
+  NtUiBackend.UserProfiles in 'NtUtilsUI\Common\NtUiBackend.UserProfiles.pas',
+  NtUiCommon.Interfaces in 'NtUtilsUI\Common\NtUiCommon.Interfaces.pas',
+  NtUiFrame.Search in 'NtUtilsUI\Prototypes\NtUiFrame.Search.pas' {SearchFrame: TFrame},
+  NtUiFrame.UserProfiles in 'NtUtilsUI\Prototypes\NtUiFrame.UserProfiles.pas' {UserProfilesFrame: TFrame},
+  NtUiFrame.AppContainer.List in 'NtUtilsUI\Prototypes\NtUiFrame.AppContainer.List.pas' {AppContainerListFrame: TFrame},
+  NtUiFrame.AppContainer.ListAllUsers in 'NtUtilsUI\Prototypes\NtUiFrame.AppContainer.ListAllUsers.pas' {AppContainerListAllUsersFrame: TFrame},
+  NtUiFrame.AppContainer.Edit in 'NtUtilsUI\Prototypes\NtUiFrame.AppContainer.Edit.pas' {AppContainerFieldFrame: TFrame},
+  NtUiCommon.Prototypes in 'NtUtilsUI\Common\NtUiCommon.Prototypes.pas',
+  NtUiDialog.FrameHost in 'NtUtilsUI\Prototypes\NtUiDialog.FrameHost.pas' {FrameHostDialog},
+  NtUiFrame.AppContainer.View in 'NtUtilsUI\Prototypes\NtUiFrame.AppContainer.View.pas' {AppContainerViewFrame: TFrame},
+  NtUiBackend.Bits in 'NtUtilsUI\Common\NtUiBackend.Bits.pas',
+  NtUiFrame.Bits in 'NtUtilsUI\Prototypes\NtUiFrame.Bits.pas' {BitsFrame: TFrame};
 
 {$R *.res}
 
